@@ -223,17 +223,20 @@ export function NotificationBell() {
     return () => unsubscribe();
   }, [user, playSound]);
 
-  // Check payment reminder every minute
+  // Check payment reminder every 5 minutes (to avoid rate limit)
   useEffect(() => {
     if (!user) return;
 
-    // Check immediately
-    checkPaymentReminder();
+    // Delay initial check by 5 seconds to avoid burst of API calls on page load
+    const initialTimeout = setTimeout(checkPaymentReminder, 5000);
 
-    // Then check every minute
-    const interval = setInterval(checkPaymentReminder, 60000);
+    // Then check every 5 minutes
+    const interval = setInterval(checkPaymentReminder, 300000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
   }, [user, checkPaymentReminder]);
 
   // Handle mark as read
