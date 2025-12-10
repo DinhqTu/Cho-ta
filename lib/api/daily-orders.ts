@@ -304,6 +304,56 @@ export async function getDailyOrderSummary(
   );
 }
 
+// Get unpaid orders for a user (all dates)
+export interface UnpaidOrdersByDate {
+  date: string;
+  orders: DailyOrderDoc[];
+  totalAmount: number;
+}
+
+export async function getUserUnpaidOrders(
+  userId: string
+): Promise<UnpaidOrdersByDate[]> {
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      DAILY_ORDERS_COLLECTION,
+      [
+        Query.equal("userId", userId),
+        Query.equal("isPaid", false),
+        Query.orderDesc("date"),
+        Query.limit(100),
+      ]
+    );
+
+    const orders = response.documents as unknown as DailyOrderDoc[];
+
+    // Group by date
+    const dateMap = new Map<string, DailyOrderDoc[]>();
+    for (const order of orders) {
+      const existing = dateMap.get(order.date);
+      if (existing) {
+        existing.push(order);
+      } else {
+        dateMap.set(order.date, [order]);
+      }
+    }
+
+    // Convert to array with totals
+    return Array.from(dateMap.entries()).map(([date, dateOrders]) => ({
+      date,
+      orders: dateOrders,
+      totalAmount: dateOrders.reduce(
+        (sum, o) => sum + o.menuItemPrice * o.quantity,
+        0
+      ),
+    }));
+  } catch (error) {
+    console.error("Error fetching user unpaid orders:", error);
+    return [];
+  }
+}
+
 // Get total stats for a date
 export interface DailyStats {
   date: string;

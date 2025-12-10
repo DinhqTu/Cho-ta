@@ -10,6 +10,7 @@ import {
   deleteMessage,
   uploadChatImage,
 } from "@/lib/api/chat";
+import { getUserNames } from "@/lib/api/user-roles";
 import {
   MessageCircle,
   Send,
@@ -50,11 +51,12 @@ function getAvatarColor(userId: string): string {
 
 interface MessageItemProps {
   message: ChatMessage;
+  userName: string;
   isOwn: boolean;
   onDelete?: () => void;
 }
 
-function MessageItem({ message, isOwn, onDelete }: MessageItemProps) {
+function MessageItem({ message, userName, isOwn, onDelete }: MessageItemProps) {
   const [showDelete, setShowDelete] = useState(false);
 
   const renderContent = () => {
@@ -86,7 +88,7 @@ function MessageItem({ message, isOwn, onDelete }: MessageItemProps) {
           getAvatarColor(message.userId)
         )}
       >
-        {message.userName.charAt(0).toUpperCase()}
+        {userName.charAt(0).toUpperCase()}
       </div>
 
       <div className={cn("max-w-[75%]", isOwn && "text-right")}>
@@ -97,7 +99,7 @@ function MessageItem({ message, isOwn, onDelete }: MessageItemProps) {
               isOwn && "order-2"
             )}
           >
-            {message.userName}
+            {userName}
           </span>
           <span className={cn("text-xs text-[#2A2A2A]/40", isOwn && "order-1")}>
             {formatTime(message.$createdAt)}
@@ -263,6 +265,7 @@ export function ChatBox({
 }: ChatBoxProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [userNames, setUserNames] = useState<Map<string, string>>(new Map());
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
@@ -284,6 +287,14 @@ export function ChatBox({
       setIsLoading(true);
       const msgs = await getTodayMessages();
       setMessages(msgs);
+
+      // Load user names for all messages
+      const userIds = [...new Set(msgs.map((m) => m.userId))];
+      if (userIds.length > 0) {
+        const names = await getUserNames(userIds);
+        setUserNames(names);
+      }
+
       setIsLoading(false);
       setTimeout(scrollToBottom, 100);
     };
@@ -291,15 +302,22 @@ export function ChatBox({
   }, []);
 
   useEffect(() => {
-    const unsubscribe = subscribeToMessages((newMsg) => {
+    const unsubscribe = subscribeToMessages(async (newMsg) => {
       setMessages((prev) => {
         if (prev.some((m) => m.$id === newMsg.$id)) return prev;
         return [...prev, newMsg];
       });
+
+      // Load user name for new message if not cached
+      if (!userNames.has(newMsg.userId)) {
+        const names = await getUserNames([newMsg.userId]);
+        setUserNames((prev) => new Map([...prev, ...names]));
+      }
+
       setTimeout(scrollToBottom, 100);
     });
     return () => unsubscribe();
-  }, []);
+  }, [userNames]);
 
   const handleSend = async (
     messageType: "text" | "image" | "gif" = "text",
@@ -487,6 +505,7 @@ export function ChatBox({
                   <MessageItem
                     key={msg.$id}
                     message={msg}
+                    userName={userNames.get(msg.userId) || msg.userName}
                     isOwn={msg.userId === user.$id}
                     onDelete={
                       msg.userId === user.$id

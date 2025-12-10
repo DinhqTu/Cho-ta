@@ -52,3 +52,21 @@ export async function isLoggedIn(): Promise<boolean> {
     return false;
   }
 }
+
+export async function updateName(name: string): Promise<User> {
+  return await account.updateName(name);
+}
+
+export async function updateEmail(
+  email: string,
+  password: string
+): Promise<User> {
+  return await account.updateEmail(email, password);
+}
+
+export async function updatePassword(
+  newPassword: string,
+  oldPassword: string
+): Promise<User> {
+  return await account.updatePassword(newPassword, oldPassword);
+}

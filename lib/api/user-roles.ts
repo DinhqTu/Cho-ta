@@ -119,7 +119,7 @@ export async function getAllUserRoles(): Promise<UserRoleData[]> {
     const response = await databases.listDocuments(
       DATABASE_ID,
       USER_ROLES_COLLECTION,
-      [Query.orderDesc("createdAt"), Query.limit(100)]
+      [Query.orderDesc("$createdAt"), Query.limit(100)]
     );
     return response.documents.map((doc) =>
       toUserRoleData(doc as unknown as UserRoleDoc)
@@ -127,6 +127,105 @@ export async function getAllUserRoles(): Promise<UserRoleData[]> {
   } catch (error) {
     console.error("Error fetching all user roles:", error);
     return [];
+  }
+}
+
+// Get user name by userId (with cache)
+const userNameCache = new Map<string, string>();
+
+export async function getUserName(userId: string): Promise<string> {
+  // Check cache first
+  if (userNameCache.has(userId)) {
+    return userNameCache.get(userId)!;
+  }
+
+  const userRole = await getUserRole(userId);
+  const name = userRole?.name || "Anonymous";
+  userNameCache.set(userId, name);
+  return name;
+}
+
+// Get multiple user names at once (batch)
+export async function getUserNames(
+  userIds: string[]
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const uncachedIds: string[] = [];
+
+  // Check cache first
+  for (const id of userIds) {
+    if (userNameCache.has(id)) {
+      result.set(id, userNameCache.get(id)!);
+    } else {
+      uncachedIds.push(id);
+    }
+  }
+
+  // Fetch uncached users
+  if (uncachedIds.length > 0) {
+    try {
+      const response = await databases.listDocuments(
+        DATABASE_ID,
+        USER_ROLES_COLLECTION,
+        [Query.equal("userId", uncachedIds), Query.limit(100)]
+      );
+
+      for (const doc of response.documents) {
+        const userDoc = doc as unknown as UserRoleDoc;
+        userNameCache.set(userDoc.userId, userDoc.name);
+        result.set(userDoc.userId, userDoc.name);
+      }
+
+      // Set "Anonymous" for users not found
+      for (const id of uncachedIds) {
+        if (!result.has(id)) {
+          userNameCache.set(id, "Anonymous");
+          result.set(id, "Anonymous");
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user names:", error);
+      // Set "Anonymous" for all uncached on error
+      for (const id of uncachedIds) {
+        result.set(id, "Anonymous");
+      }
+    }
+  }
+
+  return result;
+}
+
+// Clear user name cache (call when user updates their name)
+export function clearUserNameCache(userId?: string) {
+  if (userId) {
+    userNameCache.delete(userId);
+  } else {
+    userNameCache.clear();
+  }
+}
+
+// Update user name in user_roles collection
+export async function updateUserRoleName(
+  userId: string,
+  newName: string
+): Promise<boolean> {
+  try {
+    const userRole = await getUserRole(userId);
+    if (!userRole) return false;
+
+    await databases.updateDocument(
+      DATABASE_ID,
+      USER_ROLES_COLLECTION,
+      userRole.id,
+      { name: newName }
+    );
+
+    // Clear cache for this user
+    clearUserNameCache(userId);
+    return true;
+  } catch (error) {
+    console.error("Error updating user role name:", error);
+    return false;
   }
 }
 

@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/auth-context";
 import { UserMenu } from "./user-menu";
 import { NotificationBell } from "./notification-bell";
+import { UnpaidOrdersCard } from "./unpaid-orders-card";
 import {
   Home,
   UtensilsCrossed,
@@ -18,7 +19,7 @@ export function Header() {
   const { isAdmin } = useAuth();
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 px-4 py-3 bg-white/80 backdrop-blur-md border-b border-[#E9D7B8]/30">
+    <header className="fixed top-0 left-0 right-0 z-40 px-4 py-3 bg-white/80 backdrop-blur-md border-b border-[#E9D7B8]/30">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
         <Link
@@ -115,6 +116,9 @@ export function Header() {
           <UserMenu />
         </div>
       </div>
+
+      {/* Unpaid Orders Card */}
+      <UnpaidOrdersCard />
     </header>
   );
 }

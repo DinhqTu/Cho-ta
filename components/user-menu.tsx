@@ -69,6 +69,16 @@ export function UserMenu() {
               <button
                 onClick={() => {
                   setIsOpen(false);
+                  router.push("/profile");
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#FBF8F4] transition-colors text-left"
+              >
+                <User className="w-4 h-4 text-[#D4AF37]" />
+                <span className="text-sm text-[#2A2A2A]">Hồ sơ</span>
+              </button>
+              <button
+                onClick={() => {
+                  setIsOpen(false);
                   router.push(`/dashboard/user/${user.$id}`);
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#FBF8F4] transition-colors text-left"
