@@ -477,7 +477,7 @@ function TodayMenuContent() {
       const success = await saveDailyOrders(user, dailyOrders);
       if (success) {
         setShowCart(false);
-        router.push("/summary");
+        router.push("/group-order");
       } else {
         alert("Không thể đặt món. Vui lòng thử lại.");
       }

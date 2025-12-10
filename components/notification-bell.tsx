@@ -215,7 +215,7 @@ export function NotificationBell() {
         showLocalNotification(
           notification.title,
           notification.message,
-          "/summary"
+          "/group-order"
         );
       }
     });
