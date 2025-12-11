@@ -25,22 +25,19 @@ export async function POST(request: NextRequest) {
   try {
     const body: SMSForwarderPayload = await request.json();
 
-    // Log để debug
+    // Log để debug - xem body thực tế từ SMS Forwarder
     console.log("=== SMS Webhook Request ===");
     console.log("Body received:", JSON.stringify(body, null, 2));
 
+    // TẠM BỎ AUTH để test - sau khi biết format body thì bật lại
     // Verify secret từ body (vì SMS Forwarder không hỗ trợ custom header)
-    const secretFromBody = body.secret;
+    // const secretFromBody = body.secret;
+    // if (secretFromBody !== WEBHOOK_SECRET) {
+    //   console.log("Unauthorized - secret mismatch");
+    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // }
 
-    if (secretFromBody !== WEBHOOK_SECRET) {
-      console.log("Unauthorized - secret mismatch:", {
-        received: secretFromBody,
-        expected: WEBHOOK_SECRET,
-      });
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    console.log("Auth OK - processing SMS...");
+    console.log("Processing SMS (auth disabled for testing)...");
 
     // Extract SMS content
     const smsBody = body.text || body.message || "";
