@@ -61,9 +61,21 @@ function groupOrdersByUser(orders: DailyOrderDoc[]): UserOrderGroup[] {
     }
   }
 
-  return Array.from(userMap.values()).sort((a, b) =>
-    a.userName.localeCompare(b.userName)
-  );
+  return Array.from(userMap.values());
+}
+
+// Sort với current user lên đầu
+function sortUserGroups(
+  groups: UserOrderGroup[],
+  currentUserId?: string
+): UserOrderGroup[] {
+  return groups.sort((a, b) => {
+    // Current user luôn lên đầu
+    if (a.userId === currentUserId) return -1;
+    if (b.userId === currentUserId) return 1;
+    // Còn lại sort theo tên
+    return a.userName.localeCompare(b.userName);
+  });
 }
 
 // User Order Card Component
@@ -329,7 +341,7 @@ function SummaryContent() {
     );
   };
 
-  const userGroups = groupOrdersByUser(orders);
+  const userGroups = sortUserGroups(groupOrdersByUser(orders), user?.$id);
   const totalAmount = orders.reduce(
     (sum, o) => sum + o.menuItemPrice * o.quantity,
     0

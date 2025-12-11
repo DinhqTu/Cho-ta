@@ -77,6 +77,17 @@ export function generatePaymentCode(userId: string, date: string): string {
 }
 
 /**
+ * Loại bỏ dấu tiếng Việt
+ */
+function removeVietnameseTones(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D");
+}
+
+/**
  * Tạo nội dung chuyển khoản chuẩn
  */
 export function generatePaymentComment(
@@ -88,7 +99,10 @@ export function generatePaymentComment(
   const dateObj = new Date(date);
   const formattedDate = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
 
-  return `${paymentCode} ${userName} ${formattedDate}`;
+  // Loại bỏ dấu tiếng Việt để tránh lỗi MoMo
+  const cleanUserName = removeVietnameseTones(userName);
+
+  return `${paymentCode} ${cleanUserName} ${formattedDate}`;
 }
 
 /**

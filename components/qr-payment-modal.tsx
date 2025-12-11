@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { formatMoney } from "@/lib/utils";
 import {
   generateMoMoQRUrl,
@@ -163,17 +164,23 @@ export function QRPaymentModal({
     }
   };
 
-  if (!open) return null;
+  const [mounted, setMounted] = useState(false);
 
-  return (
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!open || !mounted) return null;
+
+  const modalContent = (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 ${
+      className={`fixed inset-0 z-9999 flex items-center justify-center p-4 bg-black/50 overflow-y-auto ${
         isAnimating ? "animate-in fade-in duration-200" : ""
       }`}
       onClick={handleOverlayClick}
     >
       <div
-        className={`w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[900px] xl:w-[1000px] max-w-[1100px] overflow-hidden rounded-2xl bg-white shadow-xl ${
+        className={`w-full sm:w-[90vw] md:w-[85vw] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-xl my-auto ${
           isAnimating ? "animate-in zoom-in-95 duration-200" : ""
         }`}
       >
@@ -386,4 +393,6 @@ export function QRPaymentModal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
