@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { parseMoMoSMS, extractPaymentCode } from "@/lib/sms-parser";
 import { databases, DATABASE_ID, Query } from "@/lib/appwrite";
 import { DAILY_ORDERS_COLLECTION } from "@/lib/api/daily-orders";
-import { sendPaymentSuccessNotification } from "@/lib/rocket-chat";
+import { sendPaymentSuccessNotification } from "@/lib/vchat";
 
 interface SMSForwarderPayload {
   // Format từ SMS Forwarder app (Zerogic) - Notification

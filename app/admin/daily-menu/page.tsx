@@ -27,7 +27,7 @@ import {
 import {
   sendDailyMenuNotification,
   sendOrderDeadlineReminder,
-} from "@/lib/rocket-chat";
+} from "@/lib/vchat";
 import { categoryEmoji } from "@/lib/menu-store";
 import { Button } from "@/components/ui/button";
 

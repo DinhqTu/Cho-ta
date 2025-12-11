@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { databases, DATABASE_ID, Query } from "@/lib/appwrite-server";
+import { serverDatabases, DATABASE_ID, Query } from "@/lib/appwrite-server";
 import { DAILY_ORDERS_COLLECTION, DailyOrderDoc } from "@/lib/api/daily-orders";
 import {
   sendPaymentReminder,
   sendIndividualPaymentReminder,
   UnpaidUserInfo,
-} from "@/lib/rocket-chat";
+} from "@/lib/vchat";
 
 // Get all unpaid orders grouped by user
 async function getUnpaidOrdersByUser(): Promise<UnpaidUserInfo[]> {
   try {
-    const response = await databases.listDocuments(
+    const response = await serverDatabases.listDocuments(
       DATABASE_ID,
       DAILY_ORDERS_COLLECTION,
       [Query.equal("isPaid", false), Query.limit(500)]

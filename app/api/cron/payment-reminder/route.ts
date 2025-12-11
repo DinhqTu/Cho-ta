@@ -5,7 +5,7 @@ import {
   DailyOrderDoc,
   getTodayDate,
 } from "@/lib/api/daily-orders";
-import { sendPaymentReminder, UnpaidUserInfo } from "@/lib/rocket-chat";
+import { sendPaymentReminder, UnpaidUserInfo } from "@/lib/vchat";
 
 // Secret key để bảo vệ cron endpoint
 const CRON_SECRET = process.env.CRONJOB_SECRET || "your-cron-secret-key";

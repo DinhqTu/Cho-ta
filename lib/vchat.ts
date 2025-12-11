@@ -1,10 +1,10 @@
 // Rocket Chat webhook integration for payment reminders
 
 // URL webhook trực tiếp - chỉ dùng cho server-side
-export const ROCKET_CHAT_WEBHOOK_URL =
+export const VCHAT_WEBHOOK_URL =
   "https://vchat.syncbim.com/hooks/693a845e4326ada38f1880b2/cxZwnn77C2cFFRZWZxAs3YXzHkS47DoFjzDbBK4PATHNp7ap";
 
-export interface RocketChatAttachment {
+export interface VChatAttachment {
   title?: string;
   title_link?: string;
   text?: string;
@@ -12,21 +12,21 @@ export interface RocketChatAttachment {
   color?: string;
 }
 
-export interface RocketChatMessage {
+export interface VChatMessage {
   text: string;
-  attachments?: RocketChatAttachment[];
+  attachments?: VChatAttachment[];
 }
 
 // Kiểm tra có đang chạy trên server không
 const isServer = typeof window === "undefined";
 
-export async function sendRocketChatMessage(
-  message: RocketChatMessage
+export async function sendVChatMessage(
+  message: VChatMessage
 ): Promise<boolean> {
   try {
     // Nếu chạy trên server, gọi trực tiếp webhook
     // Nếu chạy trên client, gọi qua API route để bypass CORS
-    const url = isServer ? ROCKET_CHAT_WEBHOOK_URL : "/api/rocket-chat";
+    const url = isServer ? VCHAT_WEBHOOK_URL : "/api/rocket-chat";
 
     const response = await fetch(url, {
       method: "POST",
@@ -81,7 +81,7 @@ export async function sendPaymentReminder(
     )
     .join("\n");
 
-  const message: RocketChatMessage = {
+  const message: VChatMessage = {
     text: `🔔 *Nhắc nhở thanh toán đơn hàng*`,
     attachments: [
       {
@@ -98,7 +98,7 @@ export async function sendPaymentReminder(
     ],
   };
 
-  return sendRocketChatMessage(message);
+  return sendVChatMessage(message);
 }
 
 export async function sendIndividualPaymentReminder(
@@ -115,7 +115,7 @@ export async function sendIndividualPaymentReminder(
     })
     .join(", ");
 
-  const message: RocketChatMessage = {
+  const message: VChatMessage = {
     text: `🔔 *Nhắc nhở thanh toán*`,
     attachments: [
       {
@@ -134,7 +134,7 @@ export async function sendIndividualPaymentReminder(
     ],
   };
 
-  return sendRocketChatMessage(message);
+  return sendVChatMessage(message);
 }
 
 export interface PaymentSuccessInfo {
@@ -148,7 +148,7 @@ export interface PaymentSuccessInfo {
 export async function sendPaymentSuccessNotification(
   payment: PaymentSuccessInfo
 ): Promise<boolean> {
-  const message: RocketChatMessage = {
+  const message: VChatMessage = {
     text: `✅ *Thanh toán thành công*`,
     attachments: [
       {
@@ -161,7 +161,7 @@ export async function sendPaymentSuccessNotification(
     ],
   };
 
-  return sendRocketChatMessage(message);
+  return sendVChatMessage(message);
 }
 
 export interface DailyMenuItemInfo {
@@ -188,7 +188,7 @@ export async function sendDailyMenuNotification(
     .map((item, i) => `${i + 1}. *${item.name}* - ${formatMoney(item.price)}`)
     .join("\n");
 
-  const message: RocketChatMessage = {
+  const message: VChatMessage = {
     text: `🍱 *Menu hôm nay - ${dateDisplay}*`,
     attachments: [
       {
@@ -205,11 +205,11 @@ export async function sendDailyMenuNotification(
     ],
   };
 
-  return sendRocketChatMessage(message);
+  return sendVChatMessage(message);
 }
 
 export async function sendOrderDeadlineReminder(): Promise<boolean> {
-  const message: RocketChatMessage = {
+  const message: VChatMessage = {
     text: `⏰ *Nhắc nhở đặt hàng*`,
     attachments: [
       {
@@ -221,5 +221,5 @@ export async function sendOrderDeadlineReminder(): Promise<boolean> {
     ],
   };
 
-  return sendRocketChatMessage(message);
+  return sendVChatMessage(message);
 }
