@@ -3,11 +3,8 @@ import { parseMoMoSMS, extractPaymentCode } from "@/lib/sms-parser";
 import { databases, DATABASE_ID, Query } from "@/lib/appwrite";
 import { DAILY_ORDERS_COLLECTION } from "@/lib/api/daily-orders";
 
-// Secret key để bảo vệ webhook (set trong SMS Forwarder)
+// Secret key để bảo vệ webhook (set trong SMS Forwarder body)
 const WEBHOOK_SECRET = process.env.SMS_WEBHOOK_SECRET || "your-secret-key-here";
-
-// Collection để lưu log giao dịch
-const PAYMENT_LOGS_COLLECTION = "payment_logs";
 
 interface SMSForwarderPayload {
   // Format từ SMS Forwarder app
@@ -28,18 +25,22 @@ export async function POST(request: NextRequest) {
   try {
     const body: SMSForwarderPayload = await request.json();
 
-    // Verify secret
-    const authHeader = request.headers.get("Authorization");
-    const secretFromHeader = authHeader?.replace("Bearer ", "");
+    // Log để debug
+    console.log("=== SMS Webhook Request ===");
+    console.log("Body received:", JSON.stringify(body, null, 2));
+
+    // Verify secret từ body (vì SMS Forwarder không hỗ trợ custom header)
     const secretFromBody = body.secret;
 
-    if (
-      secretFromHeader !== WEBHOOK_SECRET &&
-      secretFromBody !== WEBHOOK_SECRET
-    ) {
-      console.log("Unauthorized webhook attempt");
+    if (secretFromBody !== WEBHOOK_SECRET) {
+      console.log("Unauthorized - secret mismatch:", {
+        received: secretFromBody,
+        expected: WEBHOOK_SECRET,
+      });
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    console.log("Auth OK - processing SMS...");
 
     // Extract SMS content
     const smsBody = body.text || body.message || "";
@@ -107,18 +108,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET endpoint để test webhook
-export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("Authorization");
-  const secret = authHeader?.replace("Bearer ", "");
-
-  if (secret !== WEBHOOK_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+// GET endpoint để test webhook (không cần auth)
+export async function GET() {
   return NextResponse.json({
     status: "ok",
-    message: "SMS Webhook is running",
+    message: "SMS Webhook is running. Use POST to send SMS data.",
     timestamp: new Date().toISOString(),
   });
 }
