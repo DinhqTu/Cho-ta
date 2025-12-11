@@ -1,13 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { parseMoMoSMS, extractPaymentCode } from "@/lib/sms-parser";
 import { databases, DATABASE_ID, Query } from "@/lib/appwrite";
 import { DAILY_ORDERS_COLLECTION } from "@/lib/api/daily-orders";
 
-// Secret key để bảo vệ webhook (set trong SMS Forwarder body)
-const WEBHOOK_SECRET = process.env.SMS_WEBHOOK_SECRET || "your-secret-key-here";
-
 interface SMSForwarderPayload {
-  // Format từ SMS Forwarder app
+  // Format từ SMS Forwarder app (Zerogic)
   from?: string;
   text?: string;
   sentStamp?: number;
@@ -17,30 +14,18 @@ interface SMSForwarderPayload {
   sender?: string;
   message?: string;
   timestamp?: string;
-  // Secret for authentication
-  secret?: string;
+  key?: string;
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body: SMSForwarderPayload = await request.json();
 
-    // Log để debug - xem body thực tế từ SMS Forwarder
-    console.log("=== SMS Webhook Request ===");
-    console.log("Body received:", JSON.stringify(body, null, 2));
-
-    // TẠM BỎ AUTH để test - sau khi biết format body thì bật lại
-    // Verify secret từ body (vì SMS Forwarder không hỗ trợ custom header)
-    // const secretFromBody = body.secret;
-    // if (secretFromBody !== WEBHOOK_SECRET) {
-    //   console.log("Unauthorized - secret mismatch");
-    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    // }
-
-    console.log("Processing SMS (auth disabled for testing)...");
+    console.log("=== SMS Webhook ===");
+    console.log("Body:", JSON.stringify(body, null, 2));
 
     // Extract SMS content
-    const smsBody = body.text || body.message || "";
+    const smsBody = body.text || body.message || body.key || "";
     const smsSender = body.from || body.sender || "";
 
     console.log("Received SMS:", { from: smsSender, text: smsBody });
