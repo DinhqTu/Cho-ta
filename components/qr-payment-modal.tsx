@@ -9,7 +9,6 @@ import {
   generatePaymentComment,
   getMoMoConfig,
 } from "@/lib/momo-qr";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { X, Check, Loader2, Copy, Smartphone, RefreshCw } from "lucide-react";
 
 export interface QRPaymentModalProps {
@@ -19,11 +18,11 @@ export interface QRPaymentModalProps {
   date: string;
   userId: string;
   userEmail?: string;
-  orderIds?: string[]; // IDs của các orders cần thanh toán
+  orderIds?: string[];
   onConfirm: () => void;
   onClose: () => void;
   isConfirming: boolean;
-  enableAutoCheck?: boolean; // Bật tính năng tự động check thanh toán
+  enableAutoCheck?: boolean;
 }
 
 export function QRPaymentModal({
@@ -47,22 +46,25 @@ export function QRPaymentModal({
   >("pending");
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
-  // Generate payment code khi modal mở
   useEffect(() => {
     if (open) {
       const code = generatePaymentCode(userId, date);
       setPaymentCode(code);
       setPaymentStatus("pending");
       setLastChecked(null);
+      document.body.style.overflow = "hidden";
 
-      // Register pending payment nếu có orderIds
       if (orderIds.length > 0 && enableAutoCheck) {
         registerPendingPayment(code);
       }
+    } else {
+      document.body.style.overflow = "";
     }
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [open, userId, date, orderIds, enableAutoCheck]);
 
-  // Register pending payment với server
   const registerPendingPayment = async (code: string) => {
     try {
       await fetch("/api/register-payment", {
@@ -73,7 +75,7 @@ export function QRPaymentModal({
           userId,
           userName,
           userEmail,
-          amount: amount * 1000, // Convert to VND
+          amount: amount * 1000,
           orderIds,
           date,
         }),
@@ -83,7 +85,6 @@ export function QRPaymentModal({
     }
   };
 
-  // Check payment status
   const checkPaymentStatus = useCallback(async () => {
     if (!paymentCode || !enableAutoCheck) return;
 
@@ -91,12 +92,10 @@ export function QRPaymentModal({
     try {
       const response = await fetch(`/api/payment-status?code=${paymentCode}`);
       const data = await response.json();
-
       setLastChecked(new Date());
 
       if (data.isPaid) {
         setPaymentStatus("completed");
-        // Auto confirm sau 1 giây
         setTimeout(() => {
           onConfirm();
         }, 1000);
@@ -108,7 +107,6 @@ export function QRPaymentModal({
     }
   }, [paymentCode, enableAutoCheck, onConfirm]);
 
-  // Auto polling check payment status mỗi 5 giây
   useEffect(() => {
     if (!open || !enableAutoCheck || paymentStatus === "completed") return;
 
@@ -144,14 +142,22 @@ export function QRPaymentModal({
     window.open(appLink, "_blank");
   };
 
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent
-        className="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[900px] xl:w-[1000px] max-w-[1100px] p-0 overflow-hidden border-0 rounded-2xl"
-        showCloseButton={false}
-      >
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in duration-200"
+      onClick={handleOverlayClick}
+    >
+      <div className="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[900px] xl:w-[1000px] max-w-[1100px] overflow-hidden rounded-2xl bg-white shadow-xl animate-in zoom-in-95 duration-200">
         <div className="flex flex-col md:flex-row">
-          {/* Left Column - Order Info (White background) */}
+          {/* Left Column - Order Info */}
           <div className="p-6 bg-white md:w-[320px] md:min-w-[320px] md:shrink-0">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-[#2A2A2A]">
@@ -314,7 +320,7 @@ export function QRPaymentModal({
             </button>
           </div>
 
-          {/* Right Column - QR Code (Pink MoMo background) - flexible width */}
+          {/* Right Column - QR Code */}
           <div className="p-6 bg-[#ae2070] flex flex-col items-center justify-center relative md:flex-1">
             <button
               onClick={onClose}
@@ -329,7 +335,6 @@ export function QRPaymentModal({
 
             {/* QR Code with frame */}
             <div className="relative p-3 bg-white rounded-2xl shadow-lg">
-              {/* Corner decorations */}
               <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-white rounded-tl-lg" />
               <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-white rounded-tr-lg" />
               <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-white rounded-bl-lg" />
@@ -364,7 +369,7 @@ export function QRPaymentModal({
             </button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
