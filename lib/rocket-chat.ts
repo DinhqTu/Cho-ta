@@ -49,10 +49,11 @@ export interface UnpaidUserInfo {
 }
 
 export function formatMoney(amount: number): string {
+  // Nhân 1000 vì giá lưu trong DB là đơn vị nghìn (50 = 50.000đ)
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency: "VND",
-  }).format(amount);
+  }).format(amount * 1000);
 }
 
 export async function sendPaymentReminder(
@@ -148,6 +149,66 @@ export async function sendPaymentSuccessNotification(
           payment.orderCount
         }\n🔖 Mã: ${payment.paymentCode}`,
         color: "#4ECDC4",
+      },
+    ],
+  };
+
+  return sendRocketChatMessage(message);
+}
+
+export interface DailyMenuItemInfo {
+  name: string;
+  price: number;
+  category: string;
+}
+
+export async function sendDailyMenuNotification(
+  items: DailyMenuItemInfo[],
+  date: string
+): Promise<boolean> {
+  if (items.length === 0) return false;
+
+  const dateDisplay = new Date(date).toLocaleDateString("vi-VN", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+  // Build menu list
+  const menuLines = items
+    .map((item, i) => `${i + 1}. *${item.name}* - ${formatMoney(item.price)}`)
+    .join("\n");
+
+  const message: RocketChatMessage = {
+    text: `🍱 *Menu hôm nay - ${dateDisplay}*`,
+    attachments: [
+      {
+        title: "Danh sách món ăn",
+        text: menuLines,
+        color: "#D4AF37",
+      },
+      {
+        title: "🔗 Đặt hàng ngay",
+        title_link: "https://food.syncbim.com",
+        text: "Mời mọi người truy cập để đặt hàng nhé! 🙏",
+        color: "#4ECDC4",
+      },
+    ],
+  };
+
+  return sendRocketChatMessage(message);
+}
+
+export async function sendOrderDeadlineReminder(): Promise<boolean> {
+  const message: RocketChatMessage = {
+    text: `⏰ *Nhắc nhở đặt hàng*`,
+    attachments: [
+      {
+        title: "🔔 Còn 5 phút nữa sẽ chốt món!",
+        title_link: "https://food.syncbim.com",
+        text: "Mọi người nhanh tay đặt hàng nhé! Sau 5 phút sẽ không thể đặt thêm được nữa 🏃‍♂️",
+        color: "#FF6B6B",
       },
     ],
   };

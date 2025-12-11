@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { cn, formatMoney } from "@/lib/utils";
+import { formatMoney } from "@/lib/utils";
 import { AdminGuard } from "@/components/auth-guard";
 import { Header } from "@/components/header";
 import { useAuth } from "@/contexts/auth-context";
@@ -17,8 +16,20 @@ import {
   getTodayDate,
   formatDateDisplay,
 } from "@/lib/api/daily-menu";
-import { Plus, X, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Plus,
+  X,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Send,
+} from "lucide-react";
+import {
+  sendDailyMenuNotification,
+  sendOrderDeadlineReminder,
+} from "@/lib/rocket-chat";
 import { categoryEmoji } from "@/lib/menu-store";
+import { Button } from "@/components/ui/button";
 
 function DailyMenuContent() {
   const { user } = useAuth();
@@ -28,6 +39,8 @@ function DailyMenuContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
+  const [isSendingDeadline, setIsSendingDeadline] = useState(false);
 
   // Load data
   const loadData = async () => {
@@ -134,6 +147,55 @@ function DailyMenuContent() {
 
   const isToday = selectedDate === getTodayDate();
 
+  // Send notification to Rocket Chat
+  const handleSendNotification = async () => {
+    if (!dailyMenu || dailyMenu.menuItems.length === 0) {
+      alert("Chưa có món nào trong menu!");
+      return;
+    }
+
+    setIsSendingNotification(true);
+    try {
+      const items = dailyMenu.menuItems.map((item) => ({
+        name: item.name,
+        price: item.price,
+        category: item.category,
+      }));
+
+      const success = await sendDailyMenuNotification(items, selectedDate);
+
+      if (success) {
+        alert("Đã gửi thông báo menu lên VChat!");
+      } else {
+        alert("Gửi thông báo thất bại!");
+      }
+    } catch (error) {
+      console.error("Error sending notification:", error);
+      alert("Có lỗi xảy ra!");
+    } finally {
+      setIsSendingNotification(false);
+    }
+  };
+
+  // Send deadline reminder
+  const handleSendDeadlineReminder = async () => {
+    setIsSendingDeadline(true);
+    try {
+      const success = await sendOrderDeadlineReminder();
+
+      if (success) {
+        alert("Đã gửi thông báo nhắc chốt món lên VChat!");
+      } else {
+        alert("Gửi thông báo thất bại!");
+      }
+    } catch (error) {
+      console.error("Error sending deadline reminder:", error);
+      alert("Có lỗi xảy ra!");
+    } finally {
+      setIsSendingDeadline(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#F8F4EE] flex items-center justify-center">
@@ -210,15 +272,37 @@ function DailyMenuContent() {
             </p>
           </div>
 
-          {(dailyMenu?.menuItems.length || 0) < 6 && (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4AF37] text-white font-medium hover:bg-[#C5A028] transition-colors shadow-md"
-            >
-              <Plus className="w-5 h-5" />
-              Add Dish
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {dailyMenu && dailyMenu.menuItems.length > 0 && (
+              <>
+                <Button
+                  onClick={handleSendNotification}
+                  disabled={isSendingNotification}
+                >
+                  <Send className="w-4 h-4" />
+                  {isSendingNotification ? "Đang gửi..." : "Gửi Menu"}
+                </Button>
+
+                <Button
+                  onClick={handleSendDeadlineReminder}
+                  disabled={isSendingDeadline}
+                  variant="destructive"
+                >
+                  ⏰ {isSendingDeadline ? "Đang gửi..." : "Nhắc chốt món"}
+                </Button>
+              </>
+            )}
+
+            {(dailyMenu?.menuItems.length || 0) < 6 && (
+              <Button
+                onClick={() => setShowAddModal(true)}
+                className="bg-[#D4AF37] hover:bg-[#C5A028]"
+              >
+                <Plus className="w-4 h-4" />
+                Add Dish
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Daily Menu Items */}
@@ -227,16 +311,16 @@ function DailyMenuContent() {
             {dailyMenu.menuItems.map((item, index) => (
               <div
                 key={item.id}
-                className="relative bg-white rounded-2xl border border-[#E9D7B8]/50 overflow-hidden shadow-md hover:shadow-lg transition-shadow"
+                className="relative bg-white rounded-2xl group border border-[#E9D7B8]/50 overflow-hidden shadow-md hover:shadow-lg transition-shadow"
               >
                 {/* Remove button */}
-                <button
+                <Button
                   onClick={() => handleRemoveItem(item.id)}
                   disabled={isSaving}
-                  className="absolute top-3 right-3 w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors z-10 shadow-md"
+                  className="absolute top-3 hidden group-hover:flex right-3 w-8 h-8 rounded-full bg-red-500 text-white items-center justify-center hover:bg-red-600 transition-colors z-10 shadow-md"
                 >
                   <X className="w-4 h-4" />
-                </button>
+                </Button>
 
                 {/* Item number */}
                 <div className="absolute top-3 left-3 w-8 h-8 rounded-full bg-[#D4AF37] text-white flex items-center justify-center font-bold text-sm shadow-md">
@@ -284,12 +368,13 @@ function DailyMenuContent() {
             <p className="text-[#2A2A2A]/50 text-lg mb-4">
               No menu set for this date
             </p>
-            <button
+            <Button
               onClick={() => setShowAddModal(true)}
-              className="px-6 py-3 rounded-xl bg-[#D4AF37] text-white font-medium hover:bg-[#C5A028] transition-colors"
+              className="bg-[#D4AF37] hover:bg-[#C5A028] rounded-xl px-6"
+              size="lg"
             >
               Create Menu
-            </button>
+            </Button>
           </div>
         )}
       </div>
