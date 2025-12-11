@@ -1,6 +1,7 @@
 // Rocket Chat webhook integration for payment reminders
 
-const ROCKET_CHAT_WEBHOOK_URL =
+// URL webhook trực tiếp - chỉ dùng cho server-side
+export const ROCKET_CHAT_WEBHOOK_URL =
   "https://vchat.syncbim.com/hooks/693a845e4326ada38f1880b2/cxZwnn77C2cFFRZWZxAs3YXzHkS47DoFjzDbBK4PATHNp7ap";
 
 export interface RocketChatAttachment {
@@ -16,11 +17,18 @@ export interface RocketChatMessage {
   attachments?: RocketChatAttachment[];
 }
 
+// Kiểm tra có đang chạy trên server không
+const isServer = typeof window === "undefined";
+
 export async function sendRocketChatMessage(
   message: RocketChatMessage
 ): Promise<boolean> {
   try {
-    const response = await fetch(ROCKET_CHAT_WEBHOOK_URL, {
+    // Nếu chạy trên server, gọi trực tiếp webhook
+    // Nếu chạy trên client, gọi qua API route để bypass CORS
+    const url = isServer ? ROCKET_CHAT_WEBHOOK_URL : "/api/rocket-chat";
+
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
