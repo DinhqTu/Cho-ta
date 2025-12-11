@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { formatMoney } from "@/lib/utils";
 import {
   generateMoMoQRUrl,
@@ -45,25 +45,40 @@ export function QRPaymentModal({
     "pending" | "completed" | "error"
   >("pending");
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [isAnimating, setIsAnimating] = useState(true);
+  const hasGeneratedCode = useRef(false);
 
+  // Generate payment code chỉ khi modal mở lần đầu
   useEffect(() => {
-    if (open) {
+    if (open && !hasGeneratedCode.current) {
       const code = generatePaymentCode(userId, date);
       setPaymentCode(code);
       setPaymentStatus("pending");
       setLastChecked(null);
-      document.body.style.overflow = "hidden";
+      setIsAnimating(true);
+      hasGeneratedCode.current = true;
 
       if (orderIds.length > 0 && enableAutoCheck) {
         registerPendingPayment(code);
       }
+
+      // Tắt animation sau khi chạy xong
+      const timer = setTimeout(() => setIsAnimating(false), 300);
+      return () => clearTimeout(timer);
+    }
+
+    if (open) {
+      document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
+      hasGeneratedCode.current = false;
+      setIsAnimating(true); // Reset animation cho lần mở tiếp theo
     }
+
     return () => {
       document.body.style.overflow = "";
     };
-  }, [open, userId, date, orderIds, enableAutoCheck]);
+  }, [open, userId, date, enableAutoCheck]);
 
   const registerPendingPayment = async (code: string) => {
     try {
@@ -88,23 +103,23 @@ export function QRPaymentModal({
   const checkPaymentStatus = useCallback(async () => {
     if (!paymentCode || !enableAutoCheck) return;
 
-    setIsCheckingPayment(true);
-    try {
-      const response = await fetch(`/api/payment-status?code=${paymentCode}`);
-      const data = await response.json();
-      setLastChecked(new Date());
+    // setIsCheckingPayment(true);
+    // try {
+    //   const response = await fetch(`/api/payment-status?code=${paymentCode}`);
+    //   const data = await response.json();
+    //   setLastChecked(new Date());
 
-      if (data.isPaid) {
-        setPaymentStatus("completed");
-        setTimeout(() => {
-          onConfirm();
-        }, 1000);
-      }
-    } catch (error) {
-      console.error("Failed to check payment status:", error);
-    } finally {
-      setIsCheckingPayment(false);
-    }
+    //   if (data.isPaid) {
+    //     setPaymentStatus("completed");
+    //     setTimeout(() => {
+    //       onConfirm();
+    //     }, 1000);
+    //   }
+    // } catch (error) {
+    //   console.error("Failed to check payment status:", error);
+    // } finally {
+    //   setIsCheckingPayment(false);
+    // }
   }, [paymentCode, enableAutoCheck, onConfirm]);
 
   useEffect(() => {
@@ -152,10 +167,16 @@ export function QRPaymentModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in duration-200"
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 ${
+        isAnimating ? "animate-in fade-in duration-200" : ""
+      }`}
       onClick={handleOverlayClick}
     >
-      <div className="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[900px] xl:w-[1000px] max-w-[1100px] overflow-hidden rounded-2xl bg-white shadow-xl animate-in zoom-in-95 duration-200">
+      <div
+        className={`w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[900px] xl:w-[1000px] max-w-[1100px] overflow-hidden rounded-2xl bg-white shadow-xl ${
+          isAnimating ? "animate-in zoom-in-95 duration-200" : ""
+        }`}
+      >
         <div className="flex flex-col md:flex-row">
           {/* Left Column - Order Info */}
           <div className="p-6 bg-white md:w-[320px] md:min-w-[320px] md:shrink-0">
@@ -261,13 +282,6 @@ export function QRPaymentModal({
                         <Check className="w-4 h-4 text-green-600" />
                         <span className="text-sm text-green-700 font-medium">
                           Đã nhận thanh toán!
-                        </span>
-                      </>
-                    ) : isCheckingPayment ? (
-                      <>
-                        <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                        <span className="text-sm text-blue-700">
-                          Đang kiểm tra...
                         </span>
                       </>
                     ) : (
