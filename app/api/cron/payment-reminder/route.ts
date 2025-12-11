@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { databases, DATABASE_ID, Query } from "@/lib/appwrite-server";
+import { serverDatabases, DATABASE_ID, Query } from "@/lib/appwrite-server";
 import {
   DAILY_ORDERS_COLLECTION,
   DailyOrderDoc,
@@ -26,7 +26,7 @@ async function getTodayUnpaidUsers(): Promise<UnpaidUserInfo[]> {
   try {
     const today = getTodayDate();
 
-    const response = await databases.listDocuments(
+    const response = await serverDatabases.listDocuments(
       DATABASE_ID,
       DAILY_ORDERS_COLLECTION,
       [
