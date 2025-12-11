@@ -17,16 +17,15 @@ import {
   RefreshCw,
   Loader2,
   User,
-  Pencil,
   Check,
   X,
   CreditCard,
   MoreVertical,
-  QrCode,
   Edit3,
 } from "lucide-react";
-import Image from "next/image";
 import { categoryEmoji } from "@/lib/menu-store";
+import { Button } from "@/components/ui/button";
+import { QRPaymentModal } from "@/components/qr-payment-modal";
 
 // Group orders by user
 interface UserOrderGroup {
@@ -64,80 +63,6 @@ function groupOrdersByUser(orders: DailyOrderDoc[]): UserOrderGroup[] {
 
   return Array.from(userMap.values()).sort((a, b) =>
     a.userName.localeCompare(b.userName)
-  );
-}
-
-// QR Payment Modal
-interface QRPaymentModalProps {
-  amount: number;
-  onConfirm: () => void;
-  onClose: () => void;
-  isConfirming: boolean;
-}
-
-function QRPaymentModal({
-  amount,
-  onConfirm,
-  onClose,
-  isConfirming,
-}: QRPaymentModalProps) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-[#E9D7B8] overflow-hidden">
-        <div className="p-5 border-b border-[#E9D7B8]/30 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <QrCode className="w-5 h-5 text-[#D4AF37]" />
-            <h2 className="text-lg font-semibold text-[#2A2A2A]">
-              Thanh toán MoMo
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-[#FBF8F4] flex items-center justify-center hover:bg-[#F5EDE3] transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-5">
-          {/* Amount */}
-          <div className="text-center mb-4">
-            <p className="text-sm text-[#2A2A2A]/60">Số tiền cần thanh toán</p>
-            <p className="text-3xl font-bold text-[#D4AF37]">
-              {formatMoney(amount)}
-            </p>
-          </div>
-
-          {/* QR Code */}
-          <div className="relative w-full aspect-square rounded-xl overflow-hidden border-2 border-[#E9D7B8] mb-4">
-            <Image
-              src="/assets/images/momo_qr.jpg"
-              alt="MoMo QR Code"
-              fill
-              className="object-contain"
-            />
-          </div>
-
-          <p className="text-center text-sm text-[#2A2A2A]/60 mb-4">
-            Quét mã QR bằng ứng dụng MoMo để thanh toán
-          </p>
-
-          {/* Confirm Button */}
-          <button
-            onClick={onConfirm}
-            disabled={isConfirming}
-            className="w-full py-4 rounded-xl bg-[#D4AF37] text-white font-semibold hover:bg-[#C5A028] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {isConfirming ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Check className="w-5 h-5" />
-            )}
-            {isConfirming ? "Đang xử lý..." : "Xác nhận đã thanh toán"}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -355,14 +280,16 @@ function UserOrderCard({
       </div>
 
       {/* QR Payment Modal */}
-      {showQRModal && (
-        <QRPaymentModal
-          amount={unpaidAmount}
-          onConfirm={handleConfirmPayment}
-          onClose={() => setShowQRModal(false)}
-          isConfirming={isConfirmingPayment}
-        />
-      )}
+      <QRPaymentModal
+        open={showQRModal}
+        amount={unpaidAmount}
+        userName={group.userName}
+        date={getTodayDate()}
+        userId={group.userId}
+        onConfirm={handleConfirmPayment}
+        onClose={() => setShowQRModal(false)}
+        isConfirming={isConfirmingPayment}
+      />
     </div>
   );
 }
@@ -444,12 +371,12 @@ function SummaryContent() {
             />
           </div>
           <h1 className="text-xl font-bold text-[#2A2A2A]">Đơn hàng hôm nay</h1>
-          <button
+          <Button
             onClick={loadData}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#FBF8F4] transition-colors text-[#2A2A2A]/70"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg"
           >
             <RefreshCw className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       </div>
 

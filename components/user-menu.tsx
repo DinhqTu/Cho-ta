@@ -1,15 +1,21 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { LogOut, User, Settings, ChevronDown, BarChart3 } from "lucide-react";
+import { LogOut, User, BarChart3, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function UserMenu() {
   const router = useRouter();
   const { user, logout, isLoading } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -30,85 +36,61 @@ export function UserMenu() {
 
   const handleLogout = async () => {
     await logout();
-    setIsOpen(false);
     router.push("/login");
   };
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-[#FBF8F4] transition-colors"
-      >
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#C5A028] flex items-center justify-center text-white font-medium text-sm">
-          {user.name?.charAt(0).toUpperCase() || "U"}
-        </div>
-        <span className="text-sm font-medium text-[#2A2A2A] hidden sm:block">
-          {user.name || "User"}
-        </span>
-        <ChevronDown
-          className={cn(
-            "w-4 h-4 text-[#2A2A2A]/50 transition-transform",
-            isOpen && "rotate-180"
-          )}
-        />
-      </button>
-
-      {isOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setIsOpen(false)}
-          />
-          <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-[#E9D7B8]/50 overflow-hidden z-50">
-            <div className="p-4 border-b border-[#E9D7B8]/30">
-              <p className="font-medium text-[#2A2A2A]">{user.name}</p>
-              <p className="text-sm text-[#2A2A2A]/50 truncate">{user.email}</p>
-            </div>
-            <div className="p-2">
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  router.push("/profile");
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#FBF8F4] transition-colors text-left"
-              >
-                <User className="w-4 h-4 text-[#D4AF37]" />
-                <span className="text-sm text-[#2A2A2A]">Hồ sơ</span>
-              </button>
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  router.push(`/dashboard/user/${user.$id}`);
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#FBF8F4] transition-colors text-left"
-              >
-                <BarChart3 className="w-4 h-4 text-[#D4AF37]" />
-                <span className="text-sm text-[#2A2A2A]">
-                  Dashboard của tôi
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  router.push("/admin/menu");
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#FBF8F4] transition-colors text-left"
-              >
-                <Settings className="w-4 h-4 text-[#2A2A2A]/50" />
-                <span className="text-sm text-[#2A2A2A]">Manage Menu</span>
-              </button>
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-red-50 transition-colors text-left"
-              >
-                <LogOut className="w-4 h-4 text-red-500" />
-                <span className="text-sm text-red-500">Sign Out</span>
-              </button>
-            </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-[#FBF8F4] transition-colors focus:outline-none">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#C5A028] flex items-center justify-center text-white font-medium text-sm">
+            {user.name?.charAt(0).toUpperCase() || "U"}
           </div>
-        </>
-      )}
-    </div>
+          <span className="text-sm font-medium text-[#2A2A2A] hidden sm:block">
+            {user.name || "User"}
+          </span>
+          <ChevronDown className="w-4 h-4 text-[#2A2A2A]/50" />
+        </button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        align="end"
+        className="w-56 bg-white rounded-xl shadow-xl border border-[#E9D7B8]/50"
+      >
+        <DropdownMenuLabel className="p-4">
+          <p className="font-medium text-[#2A2A2A]">{user.name}</p>
+          <p className="text-sm text-[#2A2A2A]/50 truncate">{user.email}</p>
+        </DropdownMenuLabel>
+
+        <DropdownMenuSeparator className="bg-[#E9D7B8]/30" />
+
+        <DropdownMenuItem
+          onClick={() => router.push("/profile")}
+          className="px-3 py-2.5 cursor-pointer hover:bg-[#FBF8F4]"
+        >
+          <User className="w-4 h-4 text-[#D4AF37]" />
+          <span className="text-sm text-[#2A2A2A]">Hồ sơ</span>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onClick={() => router.push(`/dashboard/user/${user.$id}`)}
+          className="px-3 py-2.5 cursor-pointer hover:bg-[#FBF8F4]"
+        >
+          <BarChart3 className="w-4 h-4 text-[#D4AF37]" />
+          <span className="text-sm text-[#2A2A2A]">Dashboard của tôi</span>
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator className="bg-[#E9D7B8]/30" />
+
+        <DropdownMenuItem
+          onClick={handleLogout}
+          variant="destructive"
+          className="px-3 py-2.5 cursor-pointer hover:bg-red-50"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="text-sm">Sign Out</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

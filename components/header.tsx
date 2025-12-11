@@ -89,6 +89,15 @@ export function Header() {
           {isAdmin && (
             <>
               <Link
+                href="/admin/orders"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#FBF8F4] transition-colors text-[#2A2A2A]/70 hover:text-[#2A2A2A]"
+              >
+                <ClipboardList className="w-4 h-4" />
+                <span className="text-sm font-medium hidden sm:block">
+                  Quản lý
+                </span>
+              </Link>
+              <Link
                 href="/admin/daily-menu"
                 className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#FBF8F4] transition-colors text-[#2A2A2A]/70 hover:text-[#2A2A2A]"
               >
