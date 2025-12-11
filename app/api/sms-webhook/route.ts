@@ -4,17 +4,17 @@ import { databases, DATABASE_ID, Query } from "@/lib/appwrite";
 import { DAILY_ORDERS_COLLECTION } from "@/lib/api/daily-orders";
 
 interface SMSForwarderPayload {
-  // Format từ SMS Forwarder app (Zerogic)
+  // Format từ SMS Forwarder app (Zerogic) - Notification
+  sender?: string; // "MoMo"
+  time?: string; // "9:51 SA 11-12"
+  key?: string; // Nội dung notification: "Số tiền 2.000 ₫, kèm lời nhắn: \"...\""
+  // Format SMS truyền thống
   from?: string;
   text?: string;
+  message?: string;
   sentStamp?: number;
   receivedStamp?: number;
   sim?: string;
-  // Alternative format
-  sender?: string;
-  message?: string;
-  timestamp?: string;
-  key?: string;
 }
 
 export async function POST(request: Request) {
@@ -24,41 +24,46 @@ export async function POST(request: Request) {
     console.log("=== SMS Webhook ===");
     console.log("Body:", JSON.stringify(body, null, 2));
 
-    // Extract SMS content
-    const smsBody = body.text || body.message || body.key || "";
-    const smsSender = body.from || body.sender || "";
+    // Extract content - ưu tiên key (notification) > text > message
+    const content = body.key || body.text || body.message || "";
+    const sender = body.sender || body.from || "";
 
-    console.log("Received SMS:", { from: smsSender, text: smsBody });
+    console.log("Received:", { sender, content: content.substring(0, 100) });
 
-    // Check if SMS is from MoMo
-    const isMoMoSMS =
-      smsSender.includes("MoMo") ||
-      smsSender.includes("MOMO") ||
-      smsBody.toLowerCase().includes("momo") ||
-      /^(9029|MoMo)/.test(smsSender);
+    // Check if from MoMo
+    const isMoMo =
+      sender.toLowerCase().includes("momo") ||
+      content.toLowerCase().includes("momo") ||
+      content.includes("₫") || // Notification format có ký hiệu ₫
+      /^(9029|MoMo)/.test(sender);
 
-    if (!isMoMoSMS) {
+    if (!isMoMo) {
+      console.log("Not a MoMo notification, ignored");
       return NextResponse.json({
         success: true,
-        message: "Not a MoMo SMS, ignored",
+        message: "Not a MoMo notification, ignored",
       });
     }
 
-    // Parse MoMo SMS
-    const transaction = parseMoMoSMS(smsBody);
+    // Parse MoMo notification/SMS
+    const transaction = parseMoMoSMS(content);
 
     if (!transaction) {
-      console.log("Could not parse MoMo SMS:", smsBody);
+      console.log("Could not parse MoMo content:", content);
       return NextResponse.json({
         success: true,
-        message: "Could not parse SMS content",
+        message: "Could not parse content",
       });
     }
 
-    console.log("Parsed transaction:", transaction);
+    console.log("Parsed transaction:", {
+      amount: transaction.amount,
+      content: transaction.content,
+      paymentCode: transaction.paymentCode,
+    });
 
     // Extract payment code
-    const paymentCode = transaction.paymentCode || extractPaymentCode(smsBody);
+    const paymentCode = transaction.paymentCode || extractPaymentCode(content);
 
     if (!paymentCode) {
       console.log("No payment code found in SMS");

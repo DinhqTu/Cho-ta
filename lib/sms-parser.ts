@@ -1,5 +1,5 @@
-// SMS Parser for MoMo payment notifications
-// Parse SMS từ MoMo để extract thông tin giao dịch
+// Parser for MoMo payment notifications
+// Hỗ trợ cả SMS và Notification từ app MoMo
 
 export interface MoMoTransaction {
   amount: number;
@@ -11,74 +11,109 @@ export interface MoMoTransaction {
 }
 
 /**
- * Parse SMS từ MoMo để lấy thông tin giao dịch
+ * Parse MoMo notification/SMS để lấy thông tin giao dịch
  *
- * Các format SMS MoMo phổ biến:
- * 1. "Ban vua nhan 50,000d tu 0987654321. ND: BCM1234 TEN USER. SD: 1,500,000d"
- * 2. "Ban da nhan 50.000d tu so 0987654321. Noi dung: BCM1234. So du: 1.500.000d"
- * 3. "MOMO: +50,000d tu 0987654321 luc 10:30 05/12. ND: BCM1234. SD: 1,500,000d"
+ * Format notification từ SMS Forwarder (Zerogic):
+ * - key: "Số tiền 2.000 ₫, kèm lời nhắn: \"BCM1234 TEN USER\"..."
+ *
+ * Format SMS MoMo:
+ * - "Ban vua nhan 50,000d tu 0987654321. ND: BCM1234. SD: 1,500,000d"
  */
-export function parseMoMoSMS(smsBody: string): MoMoTransaction | null {
+export function parseMoMoSMS(text: string): MoMoTransaction | null {
   try {
-    // Normalize text - remove diacritics for easier parsing
-    const normalized = smsBody
-      .toLowerCase()
-      .replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, "a")
-      .replace(/[èéẹẻẽêềếệểễ]/g, "e")
-      .replace(/[ìíịỉĩ]/g, "i")
-      .replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, "o")
-      .replace(/[ùúụủũưừứựửữ]/g, "u")
-      .replace(/[ỳýỵỷỹ]/g, "y")
-      .replace(/đ/g, "d");
+    // Try notification format first (from SMS Forwarder)
+    const notificationResult = parseMoMoNotification(text);
+    if (notificationResult) return notificationResult;
 
-    // Check if this is a receive money SMS (not send)
-    if (!normalized.includes("nhan") && !normalized.includes("+")) {
-      return null;
-    }
-
-    // Extract amount - look for patterns like "50,000d", "50.000d", "+50,000d"
-    const amountMatch = smsBody.match(
-      /[+]?(\d{1,3}(?:[.,]\d{3})*)\s*d(?:ong)?/i
-    );
-    if (!amountMatch) return null;
-
-    const amount = parseInt(amountMatch[1].replace(/[.,]/g, ""), 10);
-
-    // Extract sender phone number
-    const senderMatch = smsBody.match(/(?:tu|from)\s*(?:so\s*)?(\d{10,11})/i);
-    const sender = senderMatch ? senderMatch[1] : "Unknown";
-
-    // Extract content/description - look for ND:, Noi dung:, etc.
-    const contentMatch = smsBody.match(/(?:nd|noi dung|n\.d)[:\s]+([^.]+)/i);
-    const content = contentMatch ? contentMatch[1].trim() : "";
-
-    // Extract balance if available
-    const balanceMatch = smsBody.match(
-      /(?:sd|so du|s\.d)[:\s]+(\d{1,3}(?:[.,]\d{3})*)\s*d/i
-    );
-    const balance = balanceMatch
-      ? parseInt(balanceMatch[1].replace(/[.,]/g, ""), 10)
-      : undefined;
-
-    // Extract payment code (BCMxxxx pattern)
-    const paymentCodeMatch =
-      content.match(/BCM[A-Z0-9]{8,}/i) || smsBody.match(/BCM[A-Z0-9]{8,}/i);
-    const paymentCode = paymentCodeMatch
-      ? paymentCodeMatch[0].toUpperCase()
-      : undefined;
-
-    return {
-      amount,
-      sender,
-      content,
-      balance,
-      timestamp: new Date(),
-      paymentCode,
-    };
+    // Fallback to SMS format
+    return parseMoMoSMSFormat(text);
   } catch (error) {
-    console.error("Error parsing MoMo SMS:", error);
+    console.error("Error parsing MoMo message:", error);
     return null;
   }
+}
+
+/**
+ * Parse MoMo notification format
+ * Example: "Số tiền 2.000 ₫, kèm lời nhắn: \"DINH QUOC TU Chuyen tien\"."
+ */
+function parseMoMoNotification(text: string): MoMoTransaction | null {
+  // Extract amount - "Số tiền 2.000 ₫" or "Số tiền 50.000 ₫"
+  const amountMatch = text.match(/[Ss]ố tiền\s*(\d{1,3}(?:[.,]\d{3})*)\s*₫/);
+  if (!amountMatch) return null;
+
+  const amount = parseInt(amountMatch[1].replace(/[.,]/g, ""), 10);
+
+  // Extract message content - kèm lời nhắn: "..."
+  const messageMatch = text.match(/kèm lời nhắn:\s*["""]([^"""]+)["""]/i);
+  const content = messageMatch ? messageMatch[1].trim() : "";
+
+  // Extract payment code (BCMxxxx pattern)
+  const paymentCode = extractPaymentCode(content) || extractPaymentCode(text);
+
+  return {
+    amount,
+    sender: "MoMo",
+    content,
+    timestamp: new Date(),
+    paymentCode: paymentCode || undefined,
+  };
+}
+
+/**
+ * Parse traditional SMS format from MoMo
+ */
+function parseMoMoSMSFormat(smsBody: string): MoMoTransaction | null {
+  // Normalize text - remove diacritics for easier parsing
+  const normalized = smsBody
+    .toLowerCase()
+    .replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, "a")
+    .replace(/[èéẹẻẽêềếệểễ]/g, "e")
+    .replace(/[ìíịỉĩ]/g, "i")
+    .replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, "o")
+    .replace(/[ùúụủũưừứựửữ]/g, "u")
+    .replace(/[ỳýỵỷỹ]/g, "y")
+    .replace(/đ/g, "d");
+
+  // Check if this is a receive money SMS (not send)
+  if (!normalized.includes("nhan") && !normalized.includes("+")) {
+    return null;
+  }
+
+  // Extract amount - look for patterns like "50,000d", "50.000d", "+50,000d"
+  const amountMatch = smsBody.match(/[+]?(\d{1,3}(?:[.,]\d{3})*)\s*d(?:ong)?/i);
+  if (!amountMatch) return null;
+
+  const amount = parseInt(amountMatch[1].replace(/[.,]/g, ""), 10);
+
+  // Extract sender phone number
+  const senderMatch = smsBody.match(/(?:tu|from)\s*(?:so\s*)?(\d{10,11})/i);
+  const sender = senderMatch ? senderMatch[1] : "Unknown";
+
+  // Extract content/description - look for ND:, Noi dung:, etc.
+  const contentMatch = smsBody.match(/(?:nd|noi dung|n\.d)[:\s]+([^.]+)/i);
+  const content = contentMatch ? contentMatch[1].trim() : "";
+
+  // Extract balance if available
+  const balanceMatch = smsBody.match(
+    /(?:sd|so du|s\.d)[:\s]+(\d{1,3}(?:[.,]\d{3})*)\s*d/i
+  );
+  const balance = balanceMatch
+    ? parseInt(balanceMatch[1].replace(/[.,]/g, ""), 10)
+    : undefined;
+
+  // Extract payment code (BCMxxxx pattern)
+  const paymentCode =
+    extractPaymentCode(content) || extractPaymentCode(smsBody);
+
+  return {
+    amount,
+    sender,
+    content,
+    balance,
+    timestamp: new Date(),
+    paymentCode: paymentCode || undefined,
+  };
 }
 
 /**
