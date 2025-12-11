@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { parseMoMoSMS, extractPaymentCode } from "@/lib/sms-parser";
 import { databases, DATABASE_ID, Query } from "@/lib/appwrite";
 import { DAILY_ORDERS_COLLECTION } from "@/lib/api/daily-orders";
+import { sendPaymentSuccessNotification } from "@/lib/rocket-chat";
 
 interface SMSForwarderPayload {
   // Format từ SMS Forwarder app (Zerogic) - Notification
@@ -170,6 +171,17 @@ async function processPayment(
         console.error(`Failed to update order ${orderId}:`, err);
       }
     }
+
+    // Gửi thông báo thanh toán thành công lên Rocket Chat
+    const userName = payment.userName as string;
+    const userEmail = payment.userEmail as string;
+    await sendPaymentSuccessNotification({
+      userName,
+      userEmail,
+      amount,
+      orderCount: updatedCount,
+      paymentCode,
+    });
 
     return {
       message: `Payment verified. Updated ${updatedCount} orders.`,

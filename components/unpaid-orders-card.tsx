@@ -168,6 +168,12 @@ export function UnpaidOrdersCard() {
         userName={user?.name || "User"}
         date={selectedDate || ""}
         userId={user?.$id || ""}
+        userEmail={user?.email}
+        orderIds={
+          unpaidOrders
+            .find((d) => d.date === selectedDate)
+            ?.orders.map((o) => o.$id) || []
+        }
         onConfirm={handleConfirmPayment}
         onClose={() => setShowQRModal(false)}
         isConfirming={isConfirming}

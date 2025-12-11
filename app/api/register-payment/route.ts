@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPendingPayment } from "@/lib/api/pending-payments";
+import {
+  createPendingPayment,
+  findExistingPendingPayment,
+} from "@/lib/api/pending-payments";
 
 /**
  * API để đăng ký pending payment khi user mở QR modal
+ * Sẽ tái sử dụng payment đã tồn tại nếu chưa hết hạn
  * POST /api/register-payment
  */
 export async function POST(request: NextRequest) {
@@ -19,6 +23,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const paymentDate = date || new Date().toISOString().split("T")[0];
+
+    // Kiểm tra xem đã có pending payment chưa hết hạn không
+    const existingPayment = await findExistingPendingPayment(
+      userId,
+      paymentDate,
+      amount
+    );
+
+    if (existingPayment) {
+      // Trả về payment đã tồn tại, client sẽ dùng paymentCode này
+      return NextResponse.json({
+        success: true,
+        reused: true,
+        payment: {
+          id: existingPayment.$id,
+          paymentCode: existingPayment.paymentCode,
+          amount: existingPayment.amount,
+          expiresAt: existingPayment.expiresAt,
+        },
+      });
+    }
+
+    // Tạo mới nếu chưa có
     const payment = await createPendingPayment({
       paymentCode,
       userId,
@@ -26,7 +54,7 @@ export async function POST(request: NextRequest) {
       userEmail: userEmail || "",
       amount,
       orderIds: orderIds || [],
-      date: date || new Date().toISOString().split("T")[0],
+      date: paymentDate,
     });
 
     if (!payment) {
@@ -38,6 +66,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      reused: false,
       payment: {
         id: payment.$id,
         paymentCode: payment.paymentCode,

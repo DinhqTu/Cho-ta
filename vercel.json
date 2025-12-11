@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/payment-reminder?secret=${CRON_SECRET}",
+      "schedule": "0,30 7-11 * * *"
+    }
+  ]
+}

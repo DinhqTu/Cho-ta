@@ -10,7 +10,17 @@ import {
   generatePaymentComment,
   getMoMoConfig,
 } from "@/lib/momo-qr";
-import { X, Check, Loader2, Copy, Smartphone, RefreshCw } from "lucide-react";
+import {
+  X,
+  Check,
+  Loader2,
+  Copy,
+  Smartphone,
+  RefreshCw,
+  Clock,
+} from "lucide-react";
+
+const EXPIRY_MINUTES = 15;
 
 export interface QRPaymentModalProps {
   open: boolean;
@@ -43,27 +53,32 @@ export function QRPaymentModal({
   const [copied, setCopied] = useState(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<
-    "pending" | "completed" | "error"
+    "pending" | "completed" | "expired" | "error"
   >("pending");
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [isAnimating, setIsAnimating] = useState(true);
+  const [timeLeft, setTimeLeft] = useState(EXPIRY_MINUTES * 60); // seconds
+  const [mounted, setMounted] = useState(false);
   const hasGeneratedCode = useRef(false);
+  const expiryTime = useRef<Date | null>(null);
 
-  // Generate payment code chỉ khi modal mở lần đầu
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Generate payment code và register khi modal mở
   useEffect(() => {
     if (open && !hasGeneratedCode.current) {
-      const code = generatePaymentCode(userId, date);
-      setPaymentCode(code);
+      // Generate code tạm để gửi lên server
+      const tempCode = generatePaymentCode(userId, date);
       setPaymentStatus("pending");
       setLastChecked(null);
       setIsAnimating(true);
       hasGeneratedCode.current = true;
 
-      if (orderIds.length > 0 && enableAutoCheck) {
-        registerPendingPayment(code);
-      }
+      // Register và lấy payment code từ server (có thể là code cũ nếu đã tồn tại)
+      registerPendingPayment(tempCode);
 
-      // Tắt animation sau khi chạy xong
       const timer = setTimeout(() => setIsAnimating(false), 300);
       return () => clearTimeout(timer);
     }
@@ -73,58 +88,124 @@ export function QRPaymentModal({
     } else {
       document.body.style.overflow = "";
       hasGeneratedCode.current = false;
-      setIsAnimating(true); // Reset animation cho lần mở tiếp theo
+      expiryTime.current = null;
+      setIsAnimating(true);
+      setPaymentCode(""); // Reset payment code khi đóng modal
     }
 
     return () => {
       document.body.style.overflow = "";
     };
-  }, [open, userId, date, enableAutoCheck]);
+  }, [open, userId, date]);
 
-  const registerPendingPayment = async (code: string) => {
+  // Countdown timer
+  useEffect(() => {
+    if (!open || paymentStatus === "completed" || paymentStatus === "expired")
+      return;
+
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          setPaymentStatus("expired");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [open, paymentStatus]);
+
+  const registerPendingPayment = async (tempCode: string) => {
     try {
-      await fetch("/api/register-payment", {
+      const response = await fetch("/api/register-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          paymentCode: code,
+          paymentCode: tempCode,
           userId,
           userName,
           userEmail,
           amount: amount * 1000,
           orderIds,
           date,
+          expiryMinutes: EXPIRY_MINUTES,
         }),
       });
+
+      if (!response.ok) {
+        console.error("Failed to register payment:", await response.text());
+        // Fallback: dùng code tạm nếu API lỗi
+        setPaymentCode(tempCode);
+        setTimeLeft(EXPIRY_MINUTES * 60);
+        expiryTime.current = new Date();
+        expiryTime.current.setMinutes(
+          expiryTime.current.getMinutes() + EXPIRY_MINUTES
+        );
+        return;
+      }
+
+      const data = await response.json();
+
+      // Sử dụng payment code từ server (có thể là code cũ nếu đã tồn tại)
+      setPaymentCode(data.payment.paymentCode);
+
+      // Tính thời gian còn lại dựa trên expiresAt từ server
+      const serverExpiresAt = new Date(data.payment.expiresAt);
+      expiryTime.current = serverExpiresAt;
+      const remainingSeconds = Math.max(
+        0,
+        Math.floor((serverExpiresAt.getTime() - Date.now()) / 1000)
+      );
+      setTimeLeft(remainingSeconds);
+
+      // Nếu đã hết hạn thì set status expired
+      if (remainingSeconds <= 0) {
+        setPaymentStatus("expired");
+      }
     } catch (error) {
       console.error("Failed to register pending payment:", error);
+      // Fallback: dùng code tạm nếu có lỗi
+      setPaymentCode(tempCode);
+      setTimeLeft(EXPIRY_MINUTES * 60);
+      expiryTime.current = new Date();
+      expiryTime.current.setMinutes(
+        expiryTime.current.getMinutes() + EXPIRY_MINUTES
+      );
     }
   };
 
   const checkPaymentStatus = useCallback(async () => {
-    if (!paymentCode || !enableAutoCheck) return;
+    if (!paymentCode || !enableAutoCheck || paymentStatus === "expired") return;
 
-    // setIsCheckingPayment(true);
-    // try {
-    //   const response = await fetch(`/api/payment-status?code=${paymentCode}`);
-    //   const data = await response.json();
-    //   setLastChecked(new Date());
+    setIsCheckingPayment(true);
+    try {
+      const response = await fetch(`/api/payment-status?code=${paymentCode}`);
+      const data = await response.json();
+      setLastChecked(new Date());
 
-    //   if (data.isPaid) {
-    //     setPaymentStatus("completed");
-    //     setTimeout(() => {
-    //       onConfirm();
-    //     }, 1000);
-    //   }
-    // } catch (error) {
-    //   console.error("Failed to check payment status:", error);
-    // } finally {
-    //   setIsCheckingPayment(false);
-    // }
-  }, [paymentCode, enableAutoCheck, onConfirm]);
+      if (data.isPaid) {
+        setPaymentStatus("completed");
+        setTimeout(() => {
+          onConfirm();
+        }, 1000);
+      }
+    } catch (error) {
+      console.error("Failed to check payment status:", error);
+    } finally {
+      setIsCheckingPayment(false);
+    }
+  }, [paymentCode, enableAutoCheck, paymentStatus, onConfirm]);
 
+  // Auto polling check payment status mỗi 5 giây
   useEffect(() => {
-    if (!open || !enableAutoCheck || paymentStatus === "completed") return;
+    if (
+      !open ||
+      !enableAutoCheck ||
+      paymentStatus === "completed" ||
+      paymentStatus === "expired"
+    )
+      return;
 
     const interval = setInterval(() => {
       checkPaymentStatus();
@@ -164,11 +245,16 @@ export function QRPaymentModal({
     }
   };
 
-  const [mounted, setMounted] = useState(false);
+  // Format time left as MM:SS
+  const formatTimeLeft = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  };
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const isExpired = paymentStatus === "expired" || timeLeft <= 0;
 
   if (!open || !mounted) return null;
 
@@ -197,6 +283,51 @@ export function QRPaymentModal({
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+
+            {/* Countdown Timer */}
+            <div
+              className={`mb-4 p-3 rounded-xl border ${
+                isExpired
+                  ? "bg-red-50 border-red-200"
+                  : timeLeft <= 60
+                  ? "bg-amber-50 border-amber-200"
+                  : "bg-blue-50 border-blue-200"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock
+                    className={`w-4 h-4 ${
+                      isExpired
+                        ? "text-red-600"
+                        : timeLeft <= 60
+                        ? "text-amber-600"
+                        : "text-blue-600"
+                    }`}
+                  />
+                  <span
+                    className={`text-sm font-medium ${
+                      isExpired
+                        ? "text-red-700"
+                        : timeLeft <= 60
+                        ? "text-amber-700"
+                        : "text-blue-700"
+                    }`}
+                  >
+                    {isExpired ? "Mã QR đã hết hạn" : "Thời gian còn lại"}
+                  </span>
+                </div>
+                {!isExpired && (
+                  <span
+                    className={`text-lg font-bold font-mono ${
+                      timeLeft <= 60 ? "text-amber-700" : "text-blue-700"
+                    }`}
+                  >
+                    {formatTimeLeft(timeLeft)}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Receiver Info */}
@@ -280,7 +411,7 @@ export function QRPaymentModal({
             </div>
 
             {/* Auto-check status indicator */}
-            {enableAutoCheck && (
+            {enableAutoCheck && !isExpired && (
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -317,32 +448,46 @@ export function QRPaymentModal({
             )}
 
             {/* Confirm Button */}
-            <button
-              onClick={onConfirm}
-              disabled={isConfirming || paymentStatus === "completed"}
-              className={`w-full py-3 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
-                paymentStatus === "completed"
-                  ? "bg-green-500 text-white"
-                  : "bg-[#D4AF37] text-white hover:bg-[#C5A028]"
-              }`}
-            >
-              {isConfirming ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : paymentStatus === "completed" ? (
-                <Check className="w-5 h-5" />
-              ) : (
-                <Check className="w-5 h-5" />
-              )}
-              {isConfirming
-                ? "Đang xử lý..."
-                : paymentStatus === "completed"
-                ? "Thanh toán thành công!"
-                : "Xác nhận đã thanh toán"}
-            </button>
+            {isExpired ? (
+              <button
+                onClick={onClose}
+                className="w-full py-3 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 bg-gray-400 text-white"
+              >
+                <X className="w-5 h-5" />
+                Đóng và tạo mã mới
+              </button>
+            ) : (
+              <button
+                onClick={onConfirm}
+                disabled={isConfirming || paymentStatus === "completed"}
+                className={`w-full py-3 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
+                  paymentStatus === "completed"
+                    ? "bg-green-500 text-white"
+                    : "bg-[#D4AF37] text-white hover:bg-[#C5A028]"
+                }`}
+              >
+                {isConfirming ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : paymentStatus === "completed" ? (
+                  <Check className="w-5 h-5" />
+                ) : (
+                  <Check className="w-5 h-5" />
+                )}
+                {isConfirming
+                  ? "Đang xử lý..."
+                  : paymentStatus === "completed"
+                  ? "Thanh toán thành công!"
+                  : "Xác nhận đã thanh toán"}
+              </button>
+            )}
           </div>
 
           {/* Right Column - QR Code */}
-          <div className="p-6 bg-[#ae2070] flex flex-col items-center justify-center relative md:flex-1">
+          <div
+            className={`p-6 flex flex-col items-center justify-center relative md:flex-1 ${
+              isExpired ? "bg-gray-400" : "bg-[#ae2070]"
+            }`}
+          >
             <button
               onClick={onClose}
               className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
@@ -351,11 +496,15 @@ export function QRPaymentModal({
             </button>
 
             <h3 className="text-white font-semibold text-lg mb-4">
-              Quét mã QR để thanh toán
+              {isExpired ? "Mã QR đã hết hạn" : "Quét mã QR để thanh toán"}
             </h3>
 
             {/* QR Code with frame */}
-            <div className="relative p-3 bg-white rounded-2xl shadow-lg">
+            <div
+              className={`relative p-3 bg-white rounded-2xl shadow-lg ${
+                isExpired ? "opacity-50" : ""
+              }`}
+            >
               <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-white rounded-tl-lg" />
               <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-white rounded-tr-lg" />
               <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-white rounded-bl-lg" />
@@ -371,23 +520,38 @@ export function QRPaymentModal({
                     "/assets/images/momo_qr.jpg";
                 }}
               />
+
+              {isExpired && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-2xl">
+                  <span className="text-white font-bold text-lg">HẾT HẠN</span>
+                </div>
+              )}
             </div>
 
             <p className="text-white/80 text-sm mt-4 text-center">
-              Sử dụng <span className="font-semibold text-white">App MoMo</span>{" "}
-              hoặc ứng dụng
-              <br />
-              camera hỗ trợ QR code để quét mã
+              {isExpired ? (
+                "Vui lòng đóng và tạo mã QR mới"
+              ) : (
+                <>
+                  Sử dụng{" "}
+                  <span className="font-semibold text-white">App MoMo</span>{" "}
+                  hoặc ứng dụng
+                  <br />
+                  camera hỗ trợ QR code để quét mã
+                </>
+              )}
             </p>
 
             {/* Open MoMo App Button */}
-            <button
-              onClick={handleOpenMoMo}
-              className="mt-4 px-6 py-2.5 rounded-full bg-white text-[#ae2070] font-medium hover:bg-white/90 transition-colors flex items-center gap-2"
-            >
-              <Smartphone className="w-4 h-4" />
-              Mở app MoMo
-            </button>
+            {!isExpired && (
+              <button
+                onClick={handleOpenMoMo}
+                className="mt-4 px-6 py-2.5 rounded-full bg-white text-[#ae2070] font-medium hover:bg-white/90 transition-colors flex items-center gap-2"
+              >
+                <Smartphone className="w-4 h-4" />
+                Mở app MoMo
+              </button>
+            )}
           </div>
         </div>
       </div>

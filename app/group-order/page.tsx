@@ -298,6 +298,8 @@ function UserOrderCard({
         userName={group.userName}
         date={getTodayDate()}
         userId={group.userId}
+        userEmail={group.userEmail}
+        orderIds={group.orders.filter((o) => !o.isPaid).map((o) => o.$id)}
         onConfirm={handleConfirmPayment}
         onClose={() => setShowQRModal(false)}
         isConfirming={isConfirmingPayment}
