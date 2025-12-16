@@ -37,8 +37,7 @@ function MenuItemForm({
   const [name, setName] = useState(item?.name || "");
   const [description, setDescription] = useState(item?.description || "");
   const [price, setPrice] = useState(item?.price?.toString() || "");
-  const [category, setCategory] = useState(item?.category || "Appetizers");
-
+  const [category, setCategory] = useState(item?.category || menuCategories[0]);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !price) return;

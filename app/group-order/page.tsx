@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { categoryEmoji } from "@/lib/menu-store";
 import { Button } from "@/components/ui/button";
-import { QRPaymentModal } from "@/components/qr-payment-modal";
+import { PayOSPaymentModal } from "@/components/payos-payment-modal";
 
 // Group orders by user
 interface UserOrderGroup {
@@ -91,12 +91,12 @@ function UserOrderCard({
   isCurrentUser,
   onMarkPaid,
   onMarkAllPaid,
-}: UserOrderCardProps) {
+  selectedDate,
+}: UserOrderCardProps & { selectedDate: string }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [showQRModal, setShowQRModal] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const [showPayOSModal, setShowPayOSModal] = useState(false);
 
   const handleTogglePaid = async (order: DailyOrderDoc) => {
     setUpdatingId(order.$id);
@@ -108,17 +108,13 @@ function UserOrderCard({
     setUpdatingId(null);
   };
 
-  const handleConfirmPayment = async () => {
-    setIsConfirmingPayment(true);
+  const handlePayOSSuccess = async () => {
     const unpaidOrders = group.orders.filter((o) => !o.isPaid);
-
     for (const order of unpaidOrders) {
       await updateOrderPaymentStatus(order.$id, true);
     }
-
     onMarkAllPaid(unpaidOrders.map((o) => o.$id));
-    setIsConfirmingPayment(false);
-    setShowQRModal(false);
+    setShowPayOSModal(false);
   };
 
   const unpaidAmount = group.orders
@@ -159,7 +155,7 @@ function UserOrderCard({
           )}
 
           {/* Dropdown Menu - Only for current user */}
-          {isCurrentUser && (
+          {/* {isCurrentUser && (
             <div className="relative">
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
@@ -179,7 +175,7 @@ function UserOrderCard({
                       <button
                         onClick={() => {
                           setShowDropdown(false);
-                          setShowQRModal(true);
+                          setShowPayOSModal(true);
                         }}
                         className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#FBF8F4] transition-colors text-left"
                       >
@@ -205,7 +201,7 @@ function UserOrderCard({
                 </>
               )}
             </div>
-          )}
+          )} */}
         </div>
       </div>
 
@@ -291,18 +287,17 @@ function UserOrderCard({
         </span>
       </div>
 
-      {/* QR Payment Modal */}
-      <QRPaymentModal
-        open={showQRModal}
+      {/* PayOS Payment Modal */}
+      <PayOSPaymentModal
+        open={showPayOSModal}
         amount={unpaidAmount}
+        description={`Thanh toan don hang ${selectedDate}`}
         userName={group.userName}
-        date={getTodayDate()}
         userId={group.userId}
         userEmail={group.userEmail}
         orderIds={group.orders.filter((o) => !o.isPaid).map((o) => o.$id)}
-        onConfirm={handleConfirmPayment}
-        onClose={() => setShowQRModal(false)}
-        isConfirming={isConfirmingPayment}
+        onSuccess={handlePayOSSuccess}
+        onClose={() => setShowPayOSModal(false)}
       />
     </div>
   );
@@ -435,6 +430,7 @@ function SummaryContent() {
               isCurrentUser={user?.$id === group.userId}
               onMarkPaid={handleMarkPaid}
               onMarkAllPaid={handleMarkAllPaid}
+              selectedDate={selectedDate}
             />
           ))
         ) : (

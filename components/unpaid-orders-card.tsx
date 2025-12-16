@@ -8,7 +8,7 @@ import {
   UnpaidOrdersByDate,
   updateOrderPaymentStatus,
 } from "@/lib/api/daily-orders";
-import { QRPaymentModal } from "@/components/qr-payment-modal";
+import { PayOSPaymentModal } from "@/components/payos-payment-modal";
 import { AlertCircle, X, QrCode, ChevronDown, ChevronUp } from "lucide-react";
 
 export function UnpaidOrdersCard() {
@@ -16,9 +16,8 @@ export function UnpaidOrdersCard() {
   const [unpaidOrders, setUnpaidOrders] = useState<UnpaidOrdersByDate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showQRModal, setShowQRModal] = useState(false);
+  const [showPayOSModal, setShowPayOSModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [isConfirming, setIsConfirming] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
@@ -42,12 +41,11 @@ export function UnpaidOrdersCard() {
 
   const handlePayment = (date: string) => {
     setSelectedDate(date);
-    setShowQRModal(true);
+    setShowPayOSModal(true);
   };
 
-  const handleConfirmPayment = async () => {
+  const handlePayOSSuccess = async () => {
     if (!selectedDate) return;
-    setIsConfirming(true);
 
     const dateOrders = unpaidOrders.find((d) => d.date === selectedDate);
     if (dateOrders) {
@@ -57,8 +55,7 @@ export function UnpaidOrdersCard() {
     }
 
     setUnpaidOrders((prev) => prev.filter((d) => d.date !== selectedDate));
-    setIsConfirming(false);
-    setShowQRModal(false);
+    setShowPayOSModal(false);
     setSelectedDate(null);
   };
 
@@ -162,11 +159,11 @@ export function UnpaidOrdersCard() {
         </div>
       </div>
 
-      <QRPaymentModal
-        open={showQRModal}
+      <PayOSPaymentModal
+        open={showPayOSModal}
         amount={selectedAmount}
+        description={`TT don hang ${selectedDate || ""}`}
         userName={user?.name || "User"}
-        date={selectedDate || ""}
         userId={user?.$id || ""}
         userEmail={user?.email}
         orderIds={
@@ -174,9 +171,8 @@ export function UnpaidOrdersCard() {
             .find((d) => d.date === selectedDate)
             ?.orders.map((o) => o.$id) || []
         }
-        onConfirm={handleConfirmPayment}
-        onClose={() => setShowQRModal(false)}
-        isConfirming={isConfirming}
+        onSuccess={handlePayOSSuccess}
+        onClose={() => setShowPayOSModal(false)}
       />
     </>
   );
