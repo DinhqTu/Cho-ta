@@ -162,7 +162,7 @@ export function UnpaidOrdersCard() {
       <PayOSPaymentModal
         open={showPayOSModal}
         amount={selectedAmount}
-        description={`TT don hang ${selectedDate || ""}`}
+        description={user?.name}
         userName={user?.name || "User"}
         userId={user?.$id || ""}
         userEmail={user?.email}

@@ -155,7 +155,7 @@ function UserOrderCard({
           )}
 
           {/* Dropdown Menu - Only for current user */}
-          {/* {isCurrentUser && (
+          {isCurrentUser && (
             <div className="relative">
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
@@ -201,7 +201,7 @@ function UserOrderCard({
                 </>
               )}
             </div>
-          )} */}
+          )}
         </div>
       </div>
 
@@ -291,7 +291,7 @@ function UserOrderCard({
       <PayOSPaymentModal
         open={showPayOSModal}
         amount={unpaidAmount}
-        description={`Thanh toan don hang ${selectedDate}`}
+        description={`${group.userName}`}
         userName={group.userName}
         userId={group.userId}
         userEmail={group.userEmail}

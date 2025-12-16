@@ -79,10 +79,12 @@ export async function POST(request: NextRequest) {
     const existingPayment = await findExistingPayOSPayment(userId, amount);
 
     if (existingPayment) {
-      // Tạo VietQR URL từ thông tin đã lưu
+      // Tạo VietQR URL với description từ PayOS (đã chứa mã đơn hàng)
       const vietQRUrl = `https://img.vietqr.io/image/${existingPayment.bin}-${
         existingPayment.accountNumber
-      }-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(
+      }-compact2.png?amount=${
+        existingPayment.amount
+      }&addInfo=${encodeURIComponent(
         existingPayment.description
       )}&accountName=${encodeURIComponent(existingPayment.accountName)}`;
 
@@ -93,7 +95,6 @@ export async function POST(request: NextRequest) {
           orderCode: parseInt(existingPayment.orderCode),
           amount: existingPayment.amount,
           qrCode: vietQRUrl,
-          qrCodeOriginal: existingPayment.qrCode,
           checkoutUrl: existingPayment.checkoutUrl,
           accountNumber: existingPayment.accountNumber,
           accountName: existingPayment.accountName,
@@ -115,6 +116,10 @@ export async function POST(request: NextRequest) {
 
     // Set expiry to 15 minutes from now
     const expiredAt = Math.floor(Date.now() / 1000) + 15 * 60;
+
+    // Tạo description có chứa orderCode để PayOS có thể xác định giao dịch
+    // PayOS yêu cầu description không quá 25 ký tự và chỉ chứa a-zA-Z0-9 và khoảng trắng
+    const payosDescription = `DH${orderCode}`;
 
     // Create PayOS payment
     const payosResponse = await createPayOSPayment({
@@ -150,7 +155,7 @@ export async function POST(request: NextRequest) {
           userName: userName || "",
           userEmail: userEmail || "",
           amount,
-          description,
+          description: payosResponse.data.description, // Lưu description từ PayOS (đã có orderCode)
           orderIds: orderIds || [],
           status: "pending",
           qrCode: payosResponse.data.qrCode,
@@ -166,7 +171,7 @@ export async function POST(request: NextRequest) {
       // Continue anyway - payment was created successfully
     }
 
-    // Tạo VietQR URL chuẩn từ thông tin PayOS trả về
+    // Tạo VietQR URL với description từ PayOS (đã chứa mã đơn hàng)
     const vietQRUrl = `https://img.vietqr.io/image/${payosResponse.data.bin}-${
       payosResponse.data.accountNumber
     }-compact2.png?amount=${
@@ -180,8 +185,7 @@ export async function POST(request: NextRequest) {
       data: {
         orderCode,
         amount: payosResponse.data.amount,
-        qrCode: vietQRUrl, // Sử dụng VietQR URL thay vì qrCode từ PayOS
-        qrCodeOriginal: payosResponse.data.qrCode, // Giữ lại QR gốc để backup
+        qrCode: vietQRUrl,
         checkoutUrl: payosResponse.data.checkoutUrl,
         accountNumber: payosResponse.data.accountNumber,
         accountName: payosResponse.data.accountName,

@@ -236,7 +236,7 @@ export function PayOSPaymentModal({
 
   const isExpired = paymentStatus === "expired" || timeLeft <= 0;
 
-  // QR code giờ là VietQR URL, dùng trực tiếp
+  // QR code là VietQR URL
   const getQrCodeSrc = (qrCode: string) => {
     if (!qrCode) return "";
     return qrCode;
@@ -344,7 +344,7 @@ export function PayOSPaymentModal({
                   </p>
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-sm text-gray-600 font-mono">
-                      {paymentData.accountNumber}
+                      STK:{paymentData.accountNumber?.replace("V3CAS", "")}
                     </p>
                     <button
                       onClick={handleCopyAccount}
@@ -541,6 +541,33 @@ export function PayOSPaymentModal({
                   Mở link thanh toán
                 </button>
               )}
+
+              {/* Security Warning */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-4">
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-600 mt-0.5 shrink-0">⚠️</span>
+                  <div className="text-xs text-amber-800">
+                    <p className="font-medium mb-1">
+                      Kiểm tra trước khi thanh toán:
+                    </p>
+                    <ul className="space-y-0.5 text-amber-700">
+                      <li>
+                        • Người nhận:{" "}
+                        <span className="font-semibold">
+                          {paymentData.accountName}
+                        </span>
+                      </li>
+                      <li>
+                        • STK:{" "}
+                        <span className="font-semibold">
+                          {paymentData.accountNumber?.replace("V3CAS", "")}
+                        </span>
+                      </li>
+                      <li>• Xác nhận thông tin trên khớp với stk nhận tiền</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         ) : null}

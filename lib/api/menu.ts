@@ -30,7 +30,11 @@ export async function fetchMenuItems(): Promise<MenuItem[]> {
     const response = await databases.listDocuments(
       DATABASE_ID,
       COLLECTIONS.MENU_ITEMS,
-      [Query.equal("isActive", true), Query.orderAsc("category")]
+      [
+        Query.equal("isActive", true),
+        Query.orderAsc("category"),
+        Query.limit(500),
+      ]
     );
     return response.documents.map((doc) =>
       toMenuItem(doc as unknown as MenuItemDoc)

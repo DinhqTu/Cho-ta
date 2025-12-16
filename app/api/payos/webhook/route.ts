@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature, PayOSWebhookData } from "@/lib/payos";
 import { serverDatabases, DATABASE_ID, Query } from "@/lib/appwrite-server";
 import { PAYOS_PAYMENTS_COLLECTION } from "../create-payment/route";
+import { DAILY_ORDERS_COLLECTION } from "@/lib/api/daily-orders";
 
 interface WebhookBody {
   code: string;
@@ -63,8 +64,22 @@ export async function POST(request: NextRequest) {
 
       console.log(`Payment ${data.orderCode} completed successfully`);
 
-      // TODO: Thêm logic xử lý sau khi thanh toán thành công
-      // Ví dụ: cập nhật trạng thái đơn hàng, gửi notification, etc.
+      // Cập nhật trạng thái isPaid cho các orders liên quan
+      if (payment.orderIds && payment.orderIds.length > 0) {
+        for (const orderId of payment.orderIds) {
+          try {
+            await serverDatabases.updateDocument(
+              DATABASE_ID,
+              DAILY_ORDERS_COLLECTION,
+              orderId,
+              { isPaid: true }
+            );
+            console.log(`Updated order ${orderId} as paid`);
+          } catch (orderError) {
+            console.error(`Failed to update order ${orderId}:`, orderError);
+          }
+        }
+      }
     } else {
       // Payment failed or cancelled
       await serverDatabases.updateDocument(
