@@ -143,13 +143,13 @@ export function UnpaidOrdersCard() {
                           {formatMoney(dateGroup.totalAmount)}
                         </p>
                       </div>
-                      <button
+                      {/* <button
                         onClick={() => handlePayment(dateGroup.date)}
                         className="px-4 py-2 rounded-lg bg-[#D4AF37] text-white text-sm font-medium hover:bg-[#C5A028] transition-colors flex items-center gap-2"
                       >
                         <QrCode className="w-4 h-4" />
                         Thanh toán
-                      </button>
+                      </button> */}
                     </div>
                   </div>
                 ))}

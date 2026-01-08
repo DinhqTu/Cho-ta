@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { cn, formatMoney } from "@/lib/utils";
-import { AdminGuard } from "@/components/auth-guard";
+import { AuthGuard } from "@/components/auth-guard";
 import { Header } from "@/components/header";
+import { useAuth } from "@/contexts/auth-context";
 import {
   getDailyOrders,
   DailyOrderDoc,
@@ -120,9 +121,11 @@ function groupWeeklyOrdersByUser(
 function OrderCard({
   order,
   onTogglePaid,
+  isAdmin = false,
 }: {
   order: DailyOrderDoc;
   onTogglePaid: (orderId: string, isPaid: boolean) => void;
+  isAdmin?: boolean;
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -162,8 +165,8 @@ function OrderCard({
         </div>
       </div>
 
-      {/* Hover overlay with toggle button */}
-      {isHovered && (
+      {/* Hover overlay with toggle button - Only for admin */}
+      {isHovered && isAdmin && (
         <div className="absolute inset-0 bg-white/95 rounded-lg flex items-center justify-center">
           <button
             onClick={handleToggle}
@@ -198,9 +201,11 @@ function OrderCard({
 function TableCell({
   orders,
   onTogglePaid,
+  isAdmin = false,
 }: {
   orders: DailyOrderDoc[];
   onTogglePaid: (orderId: string, isPaid: boolean) => void;
+  isAdmin?: boolean;
 }) {
   if (!orders || orders.length === 0) {
     return (
@@ -234,6 +239,7 @@ function TableCell({
             key={order.$id}
             order={order}
             onTogglePaid={onTogglePaid}
+            isAdmin={isAdmin}
           />
         ))}
 
@@ -279,7 +285,8 @@ function TableCell({
   );
 }
 
-function AdminOrdersContent() {
+function WeeklyOrdersContent() {
+  const { isAdmin } = useAuth();
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(
     getMonday(new Date())
   );
@@ -544,6 +551,7 @@ function AdminOrdersContent() {
                             key={date}
                             orders={user.dailyOrders.get(date) || []}
                             onTogglePaid={handleTogglePaid}
+                            isAdmin={isAdmin}
                           />
                         ))}
                         <td className="border border-[#E9D7B8]/30 p-3 bg-[#FBF8F4] text-center">
@@ -632,13 +640,13 @@ function AdminOrdersContent() {
   );
 }
 
-export default function AdminOrdersPage() {
+export default function WeeklyOrdersPage() {
   return (
-    <AdminGuard>
+    <AuthGuard>
       <Header />
       <div className="pt-16">
-        <AdminOrdersContent />
+        <WeeklyOrdersContent />
       </div>
-    </AdminGuard>
+    </AuthGuard>
   );
 }

@@ -259,42 +259,100 @@ export function MenuCard({
                 isDocked ? "max-h-28 p-3" : "max-h-[55vh] p-5"
               )}
             >
-              <div className="space-y-6">
-                {Object.entries(categories).map(([category, categoryItems]) => (
-                  <div key={category}>
-                    <h3 className="text-xs font-semibold text-[#D4AF37] uppercase tracking-wider mb-3">
-                      {category}
-                    </h3>
-                    <div className="space-y-3">
-                      {categoryItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-start gap-4 p-3 rounded-xl hover:bg-[#FBF8F4] transition-colors duration-200"
-                        >
-                          <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-[#FBF8F4] to-[#F5EDE3] flex items-center justify-center shrink-0 border border-[#E9D7B8]/30">
-                            <span className="text-2xl">
-                              {categoryEmoji[item.category] || "🍽️"}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline justify-between gap-2">
-                              <h4 className="font-medium text-[#2A2A2A]">
-                                {item.name}
-                              </h4>
-                              <span className="font-semibold text-[#D4AF37] whitespace-nowrap">
-                                {formatMoney(item.price)}
-                              </span>
-                            </div>
-                            <p className="text-sm text-[#2A2A2A]/50 mt-1 leading-relaxed">
-                              {item.description}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+              {items.length === 0 ? (
+                /* Empty State - No Menu Available */
+                <div className="flex flex-col items-center justify-center py-12 px-4">
+                  {/* Animated Icon */}
+                  <div className="relative mb-6">
+                    {/* Pulsing background glow */}
+                    <div className="absolute inset-0 bg-[#D4AF37]/20 rounded-full blur-2xl animate-pulse" />
+
+                    {/* Icon container */}
+                    <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-[#FBF8F4] to-[#F5EDE3] flex items-center justify-center border-2 border-[#E9D7B8]/50 shadow-lg">
+                      <span
+                        className="text-5xl animate-bounce"
+                        style={{ animationDuration: "2s" }}
+                      >
+                        📋
+                      </span>
                     </div>
+
+                    {/* Decorative particles */}
+                    <div className="absolute -top-2 -right-2 w-4 h-4 bg-[#D4AF37] rounded-full animate-ping opacity-50" />
+                    <div
+                      className="absolute -bottom-1 -left-1 w-3 h-3 bg-[#D4AF37] rounded-full animate-ping opacity-30"
+                      style={{ animationDelay: "0.5s" }}
+                    />
                   </div>
-                ))}
-              </div>
+
+                  {/* Message */}
+                  <h3 className="text-xl font-bold text-[#2A2A2A] mb-2 text-center">
+                    Chưa có menu hôm nay
+                  </h3>
+                  <p className="text-sm text-[#2A2A2A]/60 text-center max-w-xs leading-relaxed mb-6">
+                    Menu đang được cập nhật. Vui lòng quay lại sau hoặc liên hệ
+                    quản trị viên.
+                  </p>
+
+                  {/* Decorative divider */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-12 h-px bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent opacity-50" />
+                    <span className="text-2xl">✨</span>
+                    <div className="w-12 h-px bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent opacity-50" />
+                  </div>
+
+                  {/* Status badge */}
+                  <div className="px-4 py-2 rounded-full bg-amber-50 border border-amber-200">
+                    <p className="text-xs font-medium text-amber-700 flex items-center gap-2">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                      </span>
+                      Đang chờ cập nhật menu
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* Menu Items List */
+                <div className="space-y-6">
+                  {Object.entries(categories).map(
+                    ([category, categoryItems]) => (
+                      <div key={category}>
+                        <h3 className="text-xs font-semibold text-[#D4AF37] uppercase tracking-wider mb-3">
+                          {category}
+                        </h3>
+                        <div className="space-y-3">
+                          {categoryItems.map((item) => (
+                            <div
+                              key={item.id}
+                              className="flex items-start gap-4 p-3 rounded-xl hover:bg-[#FBF8F4] transition-colors duration-200"
+                            >
+                              <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-[#FBF8F4] to-[#F5EDE3] flex items-center justify-center shrink-0 border border-[#E9D7B8]/30">
+                                <span className="text-2xl">
+                                  {categoryEmoji[item.category] || "🍽️"}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <h4 className="font-medium text-[#2A2A2A]">
+                                    {item.name}
+                                  </h4>
+                                  <span className="font-semibold text-[#D4AF37] whitespace-nowrap">
+                                    {formatMoney(item.price)}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-[#2A2A2A]/50 mt-1 leading-relaxed">
+                                  {item.description}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
             </div>
           )}
 

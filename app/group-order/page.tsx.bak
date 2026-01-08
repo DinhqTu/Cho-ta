@@ -11,6 +11,7 @@ import {
   DailyOrderDoc,
   getTodayDate,
   updateOrderPaymentStatus,
+  deleteDailyOrder,
 } from "@/lib/api/daily-orders";
 import {
   Calendar,
@@ -22,12 +23,14 @@ import {
   CreditCard,
   MoreVertical,
   Edit3,
+  Plus,
+  Minus,
+  Trash2,
 } from "lucide-react";
 import { categoryEmoji } from "@/lib/menu-store";
 import { Button } from "@/components/ui/button";
 import { PayOSPaymentModal } from "@/components/payos-payment-modal";
-import { EditOrdersDialog } from "@/components/edit-orders-dialog";
-
+import { EditOrdersModal } from "@/components/edit-orders-modal";
 // Group orders by user
 interface UserOrderGroup {
   userId: string;
@@ -85,7 +88,7 @@ interface UserOrderCardProps {
   isCurrentUser: boolean;
   onMarkPaid: (orderId: string, isPaid: boolean) => void;
   onMarkAllPaid: (orderIds: string[]) => void;
-  onReloadOrders: () => void;
+  onOrderDeleted: (orderId: string) => void;
 }
 
 function UserOrderCard({
@@ -93,13 +96,16 @@ function UserOrderCard({
   isCurrentUser,
   onMarkPaid,
   onMarkAllPaid,
+  onOrderDeleted,
   selectedDate,
-  onReloadOrders,
 }: UserOrderCardProps & { selectedDate: string }) {
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [showPayOSModal, setShowPayOSModal] = useState(false);
+  const [editingQuantities, setEditingQuantities] = useState<
+    Record<string, number>
+  >({});
 
   const handleTogglePaid = async (order: DailyOrderDoc) => {
     setUpdatingId(order.$id);
@@ -109,6 +115,43 @@ function UserOrderCard({
       onMarkPaid(order.$id, newStatus);
     }
     setUpdatingId(null);
+  };
+
+  const handleQuantityChange = (
+    orderId: string,
+    currentQuantity: number,
+    delta: number
+  ) => {
+    const newQuantity = currentQuantity + delta;
+    if (newQuantity <= 0) {
+      // Show confirmation alert
+      const confirmed = window.confirm(
+        "Bạn có chắc muốn xóa món ăn này không?"
+      );
+      if (confirmed) {
+        handleDeleteOrder(orderId);
+      }
+    } else {
+      setEditingQuantities((prev) => ({
+        ...prev,
+        [orderId]: newQuantity,
+      }));
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    setUpdatingId(orderId);
+    const success = await deleteDailyOrder(orderId);
+    if (success) {
+      onOrderDeleted(orderId);
+    } else {
+      alert("Không thể xóa món ăn. Vui lòng thử lại.");
+    }
+    setUpdatingId(null);
+  };
+
+  const getDisplayQuantity = (order: DailyOrderDoc) => {
+    return editingQuantities[order.$id] ?? order.quantity;
   };
 
   const handlePayOSSuccess = async () => {
@@ -191,13 +234,13 @@ function UserOrderCard({
                     <button
                       onClick={() => {
                         setShowDropdown(false);
-                        setShowEditDialog(true);
+                        setIsEditing(!isEditing);
                       }}
                       className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#FBF8F4] transition-colors text-left"
                     >
                       <Edit3 className="w-4 h-4 text-[#2A2A2A]/60" />
                       <span className="text-sm font-medium text-[#2A2A2A]">
-                        Chỉnh sửa
+                        {isEditing ? "Đóng chỉnh sửa" : "Chỉnh sửa"}
                       </span>
                     </button>
                   </div>
@@ -228,9 +271,43 @@ function UserOrderCard({
             {/* Dish Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-[#2A2A2A]/60">
-                  {order.quantity}x
-                </span>
+                {isCurrentUser && isEditing ? (
+                  <div className="flex items-center gap-1 bg-white rounded-lg px-2 py-1 border border-[#E9D7B8]">
+                    <button
+                      onClick={() =>
+                        handleQuantityChange(
+                          order.$id,
+                          getDisplayQuantity(order),
+                          -1
+                        )
+                      }
+                      disabled={updatingId === order.$id}
+                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    >
+                      <Minus className="w-3 h-3 text-[#2A2A2A]" />
+                    </button>
+                    <span className="text-sm font-bold text-[#2A2A2A] min-w-[20px] text-center">
+                      {getDisplayQuantity(order)}
+                    </span>
+                    <button
+                      onClick={() =>
+                        handleQuantityChange(
+                          order.$id,
+                          getDisplayQuantity(order),
+                          1
+                        )
+                      }
+                      disabled={updatingId === order.$id}
+                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    >
+                      <Plus className="w-3 h-3 text-[#2A2A2A]" />
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-sm font-medium text-[#2A2A2A]/60">
+                    {order.quantity}x
+                  </span>
+                )}
                 <h4 className="font-medium text-[#2A2A2A] truncate">
                   {order.menuItemName}
                 </h4>
@@ -245,8 +322,35 @@ function UserOrderCard({
               </p>
             </div>
 
-            {/* Paid indicator */}
-            {order.isPaid && (
+            {/* Edit Actions */}
+            {isCurrentUser && isEditing && (
+              <button
+                onClick={() => handleTogglePaid(order)}
+                disabled={updatingId === order.$id}
+                className={cn(
+                  "px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1",
+                  order.isPaid
+                    ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                    : "bg-green-100 text-green-700 hover:bg-green-200",
+                  updatingId === order.$id && "opacity-50"
+                )}
+              >
+                {updatingId === order.$id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : order.isPaid ? (
+                  <>
+                    <X className="w-3 h-3" /> Hủy
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3 h-3" /> Đã trả
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Paid indicator when not editing */}
+            {!isEditing && order.isPaid && (
               <span className="text-green-600">
                 <Check className="w-5 h-5" />
               </span>
@@ -274,14 +378,6 @@ function UserOrderCard({
         orderIds={group.orders.filter((o) => !o.isPaid).map((o) => o.$id)}
         onSuccess={handlePayOSSuccess}
         onClose={() => setShowPayOSModal(false)}
-      />
-
-      {/* Edit Orders Dialog */}
-      <EditOrdersDialog
-        open={showEditDialog}
-        orders={group.orders}
-        onClose={() => setShowEditDialog(false)}
-        onUpdate={onReloadOrders}
       />
     </div>
   );
@@ -320,6 +416,10 @@ function SummaryContent() {
     setOrders((prev) =>
       prev.map((o) => (orderIds.includes(o.$id) ? { ...o, isPaid: true } : o))
     );
+  };
+
+  const handleOrderDeleted = (orderId: string) => {
+    setOrders((prev) => prev.filter((o) => o.$id !== orderId));
   };
 
   const userGroups = sortUserGroups(groupOrdersByUser(orders), user?.$id);
@@ -415,8 +515,7 @@ function SummaryContent() {
               onMarkPaid={handleMarkPaid}
               onMarkAllPaid={handleMarkAllPaid}
               selectedDate={selectedDate}
-              onReloadOrders={loadData}
-            />
+              onOrderDeleted={handleOrderDeleted}            />
           ))
         ) : (
           <div className="text-center py-12">

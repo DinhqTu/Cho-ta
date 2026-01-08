@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Send,
+  Search,
 } from "lucide-react";
 import {
   sendDailyMenuNotification,
@@ -41,6 +42,10 @@ function DailyMenuContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingNotification, setIsSendingNotification] = useState(false);
   const [isSendingDeadline, setIsSendingDeadline] = useState(false);
+
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   // Load data
   const loadData = async () => {
@@ -144,6 +149,24 @@ function DailyMenuContent() {
   const availableItems = allMenuItems.filter(
     (item) => !dailyMenu?.menuItems.some((di) => di.id === item.id)
   );
+
+  // Filter items by search query and category
+  const filteredItems = availableItems.filter((item) => {
+    const matchesSearch =
+      searchQuery === "" ||
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesCategory =
+      selectedCategory === "all" || item.category === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
+  // Get unique categories from available items
+  const categories = Array.from(
+    new Set(availableItems.map((item) => item.category))
+  ).sort();
 
   const isToday = selectedDate === getTodayDate();
 
@@ -388,39 +411,130 @@ function DailyMenuContent() {
                 Add Dish to Menu
               </h2>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowAddModal(false);
+                  setSearchQuery("");
+                  setSelectedCategory("all");
+                }}
                 className="w-8 h-8 rounded-full bg-[#FBF8F4] flex items-center justify-center hover:bg-[#F5EDE3] transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-5 max-h-[60vh] overflow-y-auto">
-              {availableItems.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {availableItems.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => handleAddItem(item)}
-                      disabled={isSaving}
-                      className="flex items-center gap-3 p-4 rounded-xl border border-[#E9D7B8]/50 hover:border-[#D4AF37] hover:bg-[#FBF8F4] transition-all text-left disabled:opacity-50"
-                    >
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#FBF8F4] to-[#F5EDE3] flex items-center justify-center shrink-0">
-                        <span className="text-2xl">
-                          {categoryEmoji[item.category] || "📍"}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-[#2A2A2A] truncate">
-                          {item.name}
-                        </h3>
-                        <p className="text-sm text-[#D4AF37] font-medium">
-                          {formatMoney(item.price)}
-                        </p>
-                      </div>
-                      <Plus className="w-5 h-5 text-[#D4AF37]" />
-                    </button>
-                  ))}
+            {/* Search and Filter Section */}
+            <div className="p-5 border-b border-[#E9D7B8]/20 bg-[#FBF8F4]/50 space-y-3">
+              {/* Search Input */}
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#2A2A2A]/40">
+                  <Search className="w-4 h-4" />
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Tìm kiếm món ăn..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E9D7B8] bg-white focus:outline-none focus:border-[#D4AF37] transition-colors text-sm"
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#2A2A2A]/40 hover:text-[#2A2A2A] transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Category Filter */}
+              {categories.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  <button
+                    onClick={() => setSelectedCategory("all")}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                      selectedCategory === "all"
+                        ? "bg-[#D4AF37] text-white shadow-md"
+                        : "bg-white text-[#2A2A2A]/70 border border-[#E9D7B8] hover:border-[#D4AF37]"
+                    }`}
+                  >
+                    Tất cả ({availableItems.length})
+                  </button>
+                  {categories.map((category) => {
+                    const count = availableItems.filter(
+                      (item) => item.category === category
+                    ).length;
+                    return (
+                      <button
+                        key={category}
+                        onClick={() => setSelectedCategory(category)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                          selectedCategory === category
+                            ? "bg-[#D4AF37] text-white shadow-md"
+                            : "bg-white text-[#2A2A2A]/70 border border-[#E9D7B8] hover:border-[#D4AF37]"
+                        }`}
+                      >
+                        {category} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 max-h-[50vh] overflow-y-auto">
+              {filteredItems.length > 0 ? (
+                <>
+                  {/* Results count */}
+                  <p className="text-xs text-[#2A2A2A]/50 mb-3">
+                    Tìm thấy {filteredItems.length} món ăn
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {filteredItems.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => handleAddItem(item)}
+                        disabled={isSaving}
+                        className="flex items-center gap-3 p-4 rounded-xl border border-[#E9D7B8]/50 hover:border-[#D4AF37] hover:bg-[#FBF8F4] transition-all text-left disabled:opacity-50"
+                      >
+                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#FBF8F4] to-[#F5EDE3] flex items-center justify-center shrink-0">
+                          <span className="text-2xl">
+                            {categoryEmoji[item.category] || "📍"}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-[#2A2A2A] truncate">
+                            {item.name}
+                          </h3>
+                          <p className="text-xs text-[#2A2A2A]/50 truncate">
+                            {item.category}
+                          </p>
+                          <p className="text-sm text-[#D4AF37] font-medium mt-1">
+                            {formatMoney(item.price)}
+                          </p>
+                        </div>
+                        <Plus className="w-5 h-5 text-[#D4AF37]" />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : searchQuery || selectedCategory !== "all" ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 mx-auto rounded-2xl bg-[#FBF8F4] flex items-center justify-center mb-3">
+                    <Search className="w-8 h-8 text-[#D4AF37]/50" />
+                  </div>
+                  <p className="text-[#2A2A2A]/50 mb-2">
+                    Không tìm thấy món ăn
+                  </p>
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSelectedCategory("all");
+                    }}
+                    className="text-sm text-[#D4AF37] hover:underline"
+                  >
+                    Xóa bộ lọc
+                  </button>
                 </div>
               ) : (
                 <div className="text-center py-8">

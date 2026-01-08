@@ -85,6 +85,16 @@ export function Header() {
             <span className="text-sm font-medium hidden sm:block">Lò Giản</span>
           </Link>
 
+          <Link
+            href="/weekly-orders"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#FBF8F4] transition-colors text-[#2A2A2A]/70 hover:text-[#2A2A2A]"
+          >
+            <CalendarDays className="w-4 h-4" />
+            <span className="text-sm font-medium hidden sm:block">
+              Bảng tuần
+            </span>
+          </Link>
+
           {/* Admin only tabs */}
           {isAdmin && (
             <>
@@ -127,7 +137,7 @@ export function Header() {
       </div>
 
       {/* Unpaid Orders Card */}
-      <UnpaidOrdersCard />
+      {/* <UnpaidOrdersCard /> */}
     </header>
   );
 }

@@ -203,6 +203,25 @@ export async function updateOrderPaymentStatus(
   }
 }
 
+// Update order quantity
+export async function updateOrderQuantity(
+  orderId: string,
+  quantity: number
+): Promise<boolean> {
+  try {
+    await databases.updateDocument(
+      DATABASE_ID,
+      DAILY_ORDERS_COLLECTION,
+      orderId,
+      { quantity }
+    );
+    return true;
+  } catch (error) {
+    console.error("Error updating order quantity:", error);
+    return false;
+  }
+}
+
 // Delete a daily order
 export async function deleteDailyOrder(orderId: string): Promise<boolean> {
   try {
