@@ -6,7 +6,9 @@ import { AdminGuard } from "@/components/auth-guard";
 import { Header } from "@/components/header";
 import {
   getDailyOrders,
+  getDailyOrderSummary,
   DailyOrderDoc,
+  DailyOrderSummary,
   getTodayDate,
   updateOrderPaymentStatus,
 } from "@/lib/api/daily-orders";
@@ -21,368 +23,276 @@ import {
   Check,
   X,
   Loader2,
+  User,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { categoryEmoji } from "@/lib/menu-store";
 import { Button } from "@/components/ui/button";
 
-// Get Monday of a week
-function getMonday(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(d.setDate(diff));
-}
-
-// Get Friday of a week
-function getFriday(date: Date): Date {
-  const monday = getMonday(date);
-  const friday = new Date(monday);
-  friday.setDate(monday.getDate() + 4);
-  return friday;
-}
-
-// Get all weekdays (Mon-Fri) for a week
-function getWeekdays(monday: Date): Date[] {
-  const weekdays: Date[] = [];
-  for (let i = 0; i < 5; i++) {
-    const day = new Date(monday);
-    day.setDate(monday.getDate() + i);
-    weekdays.push(day);
-  }
-  return weekdays;
-}
-
-// Format date to YYYY-MM-DD
-function formatDate(date: Date): string {
-  return date.toISOString().split("T")[0];
-}
-
-// Format weekday display
-function formatWeekday(dateStr: string): string {
-  const date = new Date(dateStr);
-  const weekdays = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-  return weekdays[date.getDay()];
-}
-
-// User weekly summary
-interface UserWeeklySummary {
+// Group orders by user
+interface UserOrderGroup {
   userId: string;
   userName: string;
   userEmail: string;
-  dailyOrders: Map<string, DailyOrderDoc[]>;
+  orders: DailyOrderDoc[];
   totalAmount: number;
+  totalItems: number;
   paidAmount: number;
   unpaidAmount: number;
 }
 
-function groupWeeklyOrdersByUser(
-  ordersByDate: Map<string, DailyOrderDoc[]>
-): UserWeeklySummary[] {
-  const userMap = new Map<string, UserWeeklySummary>();
+function groupOrdersByUser(orders: DailyOrderDoc[]): UserOrderGroup[] {
+  const userMap = new Map<string, UserOrderGroup>();
 
-  ordersByDate.forEach((orders, date) => {
-    orders.forEach((order) => {
-      const amount = order.menuItemPrice * order.quantity;
-      const existing = userMap.get(order.userId);
+  for (const order of orders) {
+    const amount = order.menuItemPrice * order.quantity;
+    const existing = userMap.get(order.userId);
 
-      if (existing) {
-        const dailyOrders = existing.dailyOrders.get(date) || [];
-        dailyOrders.push(order);
-        existing.dailyOrders.set(date, dailyOrders);
-        existing.totalAmount += amount;
-        if (order.isPaid) {
-          existing.paidAmount += amount;
-        } else {
-          existing.unpaidAmount += amount;
-        }
+    if (existing) {
+      existing.orders.push(order);
+      existing.totalAmount += amount;
+      existing.totalItems += order.quantity;
+      if (order.isPaid) {
+        existing.paidAmount += amount;
       } else {
-        const dailyOrders = new Map<string, DailyOrderDoc[]>();
-        dailyOrders.set(date, [order]);
-        userMap.set(order.userId, {
-          userId: order.userId,
-          userName: order.userName,
-          userEmail: order.userEmail,
-          dailyOrders,
-          totalAmount: amount,
-          paidAmount: order.isPaid ? amount : 0,
-          unpaidAmount: order.isPaid ? 0 : amount,
-        });
+        existing.unpaidAmount += amount;
       }
-    });
-  });
+    } else {
+      userMap.set(order.userId, {
+        userId: order.userId,
+        userName: order.userName,
+        userEmail: order.userEmail,
+        orders: [order],
+        totalAmount: amount,
+        totalItems: order.quantity,
+        paidAmount: order.isPaid ? amount : 0,
+        unpaidAmount: order.isPaid ? 0 : amount,
+      });
+    }
+  }
 
   return Array.from(userMap.values()).sort((a, b) =>
     a.userName.localeCompare(b.userName)
   );
 }
 
-// Order Card Component
-function OrderCard({
-  order,
+function formatDateDisplay(dateStr: string): string {
+  const date = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (dateStr === today.toISOString().split("T")[0]) {
+    return "Hôm nay";
+  } else if (dateStr === yesterday.toISOString().split("T")[0]) {
+    return "Hôm qua";
+  }
+  return date.toLocaleDateString("vi-VN", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+// User Card Component
+function UserCard({
+  group,
   onTogglePaid,
 }: {
-  order: DailyOrderDoc;
+  group: UserOrderGroup;
   onTogglePaid: (orderId: string, isPaid: boolean) => void;
 }) {
-  const [isHovered, setIsHovered] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  const handleToggle = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsUpdating(true);
+  const handleTogglePaid = async (order: DailyOrderDoc) => {
+    setUpdatingId(order.$id);
     const newStatus = !order.isPaid;
     const success = await updateOrderPaymentStatus(order.$id, newStatus);
     if (success) {
       onTogglePaid(order.$id, newStatus);
     }
-    setIsUpdating(false);
+    setUpdatingId(null);
   };
 
+  const allPaid = group.unpaidAmount === 0;
+
   return (
-    <div
-      className={cn(
-        "relative group p-2 rounded-lg border transition-all",
-        order.isPaid
-          ? "bg-green-50 border-green-200"
-          : "bg-amber-50 border-amber-200",
-        isHovered && "shadow-md"
-      )}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-lg">
-          {categoryEmoji[order.menuItemCategory] || "📍"}
-        </span>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-[#2A2A2A] truncate">
-            {order.menuItemName}
-          </p>
-          <p className="text-xs text-[#2A2A2A]/50">x{order.quantity}</p>
+    <div className="bg-white rounded-2xl border border-[#E9D7B8]/50 overflow-hidden shadow-sm">
+      {/* User Header */}
+      <div
+        className="p-4 flex items-center justify-between cursor-pointer hover:bg-[#FBF8F4]/50 transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-[#E9D7B8]/30 flex items-center justify-center">
+            <User className="w-5 h-5 text-[#2A2A2A]/60" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-[#2A2A2A]">{group.userName}</h3>
+            <p className="text-sm text-[#2A2A2A]/50">
+              {group.totalItems} món • {formatMoney(group.totalAmount)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {allPaid ? (
+            <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium flex items-center gap-1">
+              <Check className="w-3 h-3" /> Đã thanh toán
+            </span>
+          ) : (
+            <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-sm font-medium">
+              Còn {formatMoney(group.unpaidAmount)}
+            </span>
+          )}
+          {isExpanded ? (
+            <ChevronUp className="w-5 h-5 text-[#2A2A2A]/40" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-[#2A2A2A]/40" />
+          )}
         </div>
       </div>
 
-      {/* Hover overlay with toggle button */}
-      {isHovered && (
-        <div className="absolute inset-0 bg-white/95 rounded-lg flex items-center justify-center">
-          <button
-            onClick={handleToggle}
-            disabled={isUpdating}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1",
-              order.isPaid
-                ? "bg-amber-500 text-white hover:bg-amber-600"
-                : "bg-green-500 text-white hover:bg-green-600",
-              isUpdating && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            {isUpdating ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : order.isPaid ? (
-              <>
-                <X className="w-3 h-3" /> Hủy
-              </>
-            ) : (
-              <>
-                <Check className="w-3 h-3" /> Trả
-              </>
-            )}
-          </button>
+      {/* Orders List */}
+      {isExpanded && (
+        <div className="px-4 pb-4 space-y-2 border-t border-[#E9D7B8]/30 pt-3">
+          {group.orders.map((order) => (
+            <div
+              key={order.$id}
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-xl transition-colors",
+                order.isPaid ? "bg-green-50" : "bg-[#FBF8F4]"
+              )}
+            >
+              <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center border border-[#E9D7B8]/30 shrink-0">
+                <span className="text-xl">
+                  {categoryEmoji[order.menuItemCategory] || "📍"}
+                </span>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-[#2A2A2A]/60">
+                    {order.quantity}x
+                  </span>
+                  <h4 className="font-medium text-[#2A2A2A] truncate">
+                    {order.menuItemName}
+                  </h4>
+                </div>
+                {order.note && (
+                  <p className="text-xs text-[#2A2A2A]/50 mt-0.5">
+                    Ghi chú: {order.note}
+                  </p>
+                )}
+                <p className="text-sm font-semibold text-[#D4AF37] mt-1">
+                  {formatMoney(order.menuItemPrice * order.quantity)}
+                </p>
+              </div>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTogglePaid(order);
+                }}
+                disabled={updatingId === order.$id}
+                className={cn(
+                  "px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1",
+                  order.isPaid
+                    ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                    : "bg-green-100 text-green-700 hover:bg-green-200",
+                  updatingId === order.$id && "opacity-50"
+                )}
+              >
+                {updatingId === order.$id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : order.isPaid ? (
+                  <>
+                    <X className="w-3 h-3" /> Hủy
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3 h-3" /> Đã trả
+                  </>
+                )}
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-// Table Cell Component
-function TableCell({
-  orders,
-  onTogglePaid,
-}: {
-  orders: DailyOrderDoc[];
-  onTogglePaid: (orderId: string, isPaid: boolean) => void;
-}) {
-  if (!orders || orders.length === 0) {
-    return (
-      <td className="border border-[#E9D7B8]/30 p-3 bg-gray-50/50 min-w-[180px]">
-        <p className="text-xs text-[#2A2A2A]/30 text-center">-</p>
-      </td>
-    );
-  }
-
-  const totalAmount = orders.reduce(
-    (sum, o) => sum + o.menuItemPrice * o.quantity,
-    0
-  );
-  const paidAmount = orders
-    .filter((o) => o.isPaid)
-    .reduce((sum, o) => sum + o.menuItemPrice * o.quantity, 0);
-  const unpaidAmount = totalAmount - paidAmount;
-  const allPaid = unpaidAmount === 0;
-
-  return (
-    <td
-      className={cn(
-        "border border-[#E9D7B8]/30 p-3 min-w-[180px] align-top",
-        allPaid ? "bg-green-50/30" : "bg-amber-50/30"
-      )}
-    >
-      <div className="space-y-2">
-        {/* Order cards */}
-        {orders.map((order) => (
-          <OrderCard
-            key={order.$id}
-            order={order}
-            onTogglePaid={onTogglePaid}
-          />
-        ))}
-
-        {/* Summary */}
-        <div
-          className={cn(
-            "pt-2 border-t space-y-1",
-            allPaid ? "border-green-200" : "border-amber-200"
-          )}
-        >
-          {/* Show paid amount if any */}
-          {paidAmount > 0 && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <Check className="w-3 h-3 text-green-600" />
-                <span className="text-xs text-green-600 font-medium">
-                  Đã trả:
-                </span>
-              </div>
-              <span className="text-sm font-bold text-green-600">
-                {formatMoney(paidAmount)}
-              </span>
-            </div>
-          )}
-
-          {/* Show unpaid amount if any */}
-          {unpaidAmount > 0 && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <X className="w-3 h-3 text-amber-600" />
-                <span className="text-xs text-amber-600 font-medium">
-                  Chưa trả:
-                </span>
-              </div>
-              <span className="text-sm font-bold text-amber-600">
-                {formatMoney(unpaidAmount)}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    </td>
-  );
-}
-
 function AdminOrdersContent() {
-  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(
-    getMonday(new Date())
-  );
-  const [ordersByDate, setOrdersByDate] = useState<
-    Map<string, DailyOrderDoc[]>
-  >(new Map());
+  const [selectedDate, setSelectedDate] = useState(getTodayDate());
+  const [orders, setOrders] = useState<DailyOrderDoc[]>([]);
+  const [summary, setSummary] = useState<DailyOrderSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"users" | "dishes">("users");
 
-  const weekdays = getWeekdays(currentWeekStart);
-  const weekdayDates = weekdays.map(formatDate);
-
-  const loadWeekData = async () => {
+  const loadData = async () => {
     setIsLoading(true);
     try {
-      const ordersMap = new Map<string, DailyOrderDoc[]>();
-      await Promise.all(
-        weekdayDates.map(async (date) => {
-          const orders = await getDailyOrders(date);
-          ordersMap.set(date, orders);
-        })
-      );
-      setOrdersByDate(ordersMap);
+      const [ordersData, summaryData] = await Promise.all([
+        getDailyOrders(selectedDate),
+        getDailyOrderSummary(selectedDate),
+      ]);
+      setOrders(ordersData);
+      setSummary(summaryData);
     } catch (error) {
-      console.error("Error loading week data:", error);
+      console.error("Error loading data:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadWeekData();
-  }, [currentWeekStart]);
+    loadData();
+  }, [selectedDate]);
 
-  const goToPreviousWeek = () => {
-    const newMonday = new Date(currentWeekStart);
-    newMonday.setDate(newMonday.getDate() - 7);
-    setCurrentWeekStart(newMonday);
+  const goToPreviousDay = () => {
+    const date = new Date(selectedDate);
+    date.setDate(date.getDate() - 1);
+    setSelectedDate(date.toISOString().split("T")[0]);
   };
 
-  const goToNextWeek = () => {
-    const newMonday = new Date(currentWeekStart);
-    newMonday.setDate(newMonday.getDate() + 7);
-    setCurrentWeekStart(newMonday);
+  const goToNextDay = () => {
+    const date = new Date(selectedDate);
+    date.setDate(date.getDate() + 1);
+    setSelectedDate(date.toISOString().split("T")[0]);
   };
 
-  const goToCurrentWeek = () => {
-    setCurrentWeekStart(getMonday(new Date()));
+  const goToToday = () => {
+    setSelectedDate(getTodayDate());
   };
 
   const handleTogglePaid = (orderId: string, isPaid: boolean) => {
-    setOrdersByDate((prev) => {
-      const newMap = new Map(prev);
-      newMap.forEach((orders, date) => {
-        const updatedOrders = orders.map((o) =>
-          o.$id === orderId ? { ...o, isPaid } : o
-        );
-        newMap.set(date, updatedOrders);
-      });
-      return newMap;
-    });
+    setOrders((prev) =>
+      prev.map((o) => (o.$id === orderId ? { ...o, isPaid } : o))
+    );
   };
 
-  const userSummaries = groupWeeklyOrdersByUser(ordersByDate);
+  const userGroups = groupOrdersByUser(orders);
+  const totalAmount = orders.reduce(
+    (sum, o) => sum + o.menuItemPrice * o.quantity,
+    0
+  );
+  const totalItems = orders.reduce((sum, o) => sum + o.quantity, 0);
+  const paidAmount = orders
+    .filter((o) => o.isPaid)
+    .reduce((sum, o) => sum + o.menuItemPrice * o.quantity, 0);
 
-  // Calculate column totals (per day)
-  const columnTotals = weekdayDates.map((date) => {
-    const orders = ordersByDate.get(date) || [];
-    const total = orders.reduce(
-      (sum, o) => sum + o.menuItemPrice * o.quantity,
-      0
-    );
-    const paid = orders
-      .filter((o) => o.isPaid)
-      .reduce((sum, o) => sum + o.menuItemPrice * o.quantity, 0);
-    return { total, paid, unpaid: total - paid };
-  });
-
-  // Calculate overall totals
-  let totalOrders = 0;
-  let totalAmount = 0;
-  let paidAmount = 0;
-
-  ordersByDate.forEach((orders) => {
-    orders.forEach((order) => {
-      totalOrders += order.quantity;
-      const amount = order.menuItemPrice * order.quantity;
-      totalAmount += amount;
-      if (order.isPaid) {
-        paidAmount += amount;
-      }
-    });
-  });
-
-  const isCurrentWeek =
-    formatDate(currentWeekStart) === formatDate(getMonday(new Date()));
-  const weekEndDate = getFriday(currentWeekStart);
+  const isToday = selectedDate === getTodayDate();
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#F8F4EE] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 text-[#D4AF37] animate-spin" />
-          <p className="text-[#2A2A2A]/50">Đang tải dữ liệu tuần...</p>
+          <p className="text-[#2A2A2A]/50">Đang tải...</p>
         </div>
       </div>
     );
@@ -396,78 +306,54 @@ function AdminOrdersContent() {
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#D4AF37]/8 rounded-full blur-3xl" />
       </div>
 
-      {/* Week Navigation */}
-      <div className="relative z-10 px-3 py-4 border-b border-[#E9D7B8]/30 bg-white/50 backdrop-blur-sm sticky top-16">
-        <div className="max-w-[98%] mx-auto">
+      {/* Date Navigation */}
+      <div className="relative z-10 px-6 py-4 border-b border-[#E9D7B8]/30 bg-white/50">
+        <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between">
-            <Button
-              onClick={goToPreviousWeek}
-              variant="ghost"
-              className="p-2 rounded-lg"
-            >
-              <ChevronLeft className="w-5 h-5" />
+            <Button onClick={goToPreviousDay} className="p-2 rounded-lg">
+              <ChevronLeft className="w-5 h-5 text-[#2A2A2A]/70" />
             </Button>
 
             <div className="flex items-center gap-4">
               <Calendar className="w-5 h-5 text-[#D4AF37]" />
               <div className="text-center">
-                <h2 className="text-lg font-bold text-[#2A2A2A]">
-                  Tuần {formatDate(currentWeekStart).slice(5)} -{" "}
-                  {formatDate(weekEndDate).slice(5)}
-                </h2>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="text-lg font-bold text-[#2A2A2A] bg-transparent border-none focus:outline-none cursor-pointer"
+                />
                 <p className="text-sm text-[#2A2A2A]/50">
-                  {currentWeekStart.toLocaleDateString("vi-VN", {
-                    day: "2-digit",
-                    month: "long",
-                  })}{" "}
-                  -{" "}
-                  {weekEndDate.toLocaleDateString("vi-VN", {
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric",
-                  })}
+                  {formatDateDisplay(selectedDate)}
                 </p>
               </div>
-              {!isCurrentWeek && (
+              {!isToday && (
                 <button
-                  onClick={goToCurrentWeek}
+                  onClick={goToToday}
                   className="px-3 py-1 text-xs rounded-full bg-[#D4AF37]/20 text-[#D4AF37] font-medium hover:bg-[#D4AF37]/30 transition-colors"
                 >
-                  Tuần này
+                  Hôm nay
                 </button>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={loadWeekData}
-                variant="ghost"
-                className="p-2 rounded-lg"
-              >
-                <RefreshCw className="w-5 h-5" />
-              </Button>
-              <Button
-                onClick={goToNextWeek}
-                variant="ghost"
-                className="p-2 rounded-lg"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </Button>
-            </div>
+            <Button onClick={loadData} className="p-2 rounded-lg">
+              <RefreshCw className="w-5 h-5 text-[#2A2A2A]/70" />
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Week Stats */}
-      <div className="relative z-10 px-3 py-4 border-b border-[#E9D7B8]/30 bg-white/30">
-        <div className="max-w-[98%] mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Stats */}
+      <div className="relative z-10 px-6 py-4 border-b border-[#E9D7B8]/30 bg-white/30">
+        <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl p-4 border border-[#E9D7B8]/30">
             <div className="flex items-center gap-2 text-[#2A2A2A]/60 mb-1">
               <Users className="w-4 h-4" />
               <span className="text-sm">Người đặt</span>
             </div>
             <p className="text-2xl font-bold text-[#D4AF37]">
-              {userSummaries.length}
+              {userGroups.length}
             </p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-[#E9D7B8]/30">
@@ -475,7 +361,7 @@ function AdminOrdersContent() {
               <ShoppingBag className="w-4 h-4" />
               <span className="text-sm">Tổng món</span>
             </div>
-            <p className="text-2xl font-bold text-[#D4AF37]">{totalOrders}</p>
+            <p className="text-2xl font-bold text-[#D4AF37]">{totalItems}</p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-[#E9D7B8]/30">
             <div className="flex items-center gap-2 text-[#2A2A2A]/60 mb-1">
@@ -498,135 +384,120 @@ function AdminOrdersContent() {
         </div>
       </div>
 
-      {/* Calendar Table */}
-      <div className="relative z-10 max-w-[98%] mx-auto px-3 py-6">
-        <div className="bg-white rounded-2xl border border-[#E9D7B8]/50 shadow-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-[#FBF8F4]">
-                  <th className="border border-[#E9D7B8]/30 p-3 text-left font-semibold text-[#2A2A2A] sticky left-0 bg-[#FBF8F4] z-10 min-w-[150px]">
-                    Người đặt
-                  </th>
-                  {weekdayDates.map((date, index) => (
-                    <th
-                      key={date}
-                      className="border border-[#E9D7B8]/30 p-3 text-center font-semibold text-[#2A2A2A] min-w-[180px]"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-sm">{formatWeekday(date)}</span>
-                        <span className="text-xs text-[#2A2A2A]/50">
-                          {date.slice(5)}
-                        </span>
-                      </div>
-                    </th>
-                  ))}
-                  <th className="border border-[#E9D7B8]/30 p-3 text-center font-semibold text-[#2A2A2A] bg-[#FBF8F4] min-w-[120px]">
-                    Tổng tuần
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {userSummaries.length > 0 ? (
-                  <>
-                    {userSummaries.map((user) => (
-                      <tr key={user.userId} className="hover:bg-[#FBF8F4]/30">
-                        <td className="border border-[#E9D7B8]/30 p-3 font-medium text-[#2A2A2A] sticky left-0 bg-white z-10">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-[#E9D7B8]/30 flex items-center justify-center text-xs">
-                              {user.userName.charAt(0)}
-                            </div>
-                            <span className="truncate">{user.userName}</span>
-                          </div>
-                        </td>
-                        {weekdayDates.map((date) => (
-                          <TableCell
-                            key={date}
-                            orders={user.dailyOrders.get(date) || []}
-                            onTogglePaid={handleTogglePaid}
-                          />
-                        ))}
-                        <td className="border border-[#E9D7B8]/30 p-3 bg-[#FBF8F4] text-center">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-lg font-bold text-[#D4AF37]">
-                              {formatMoney(user.totalAmount)}
-                            </span>
-                            {user.unpaidAmount > 0 && (
-                              <span className="text-xs text-amber-600">
-                                Còn {formatMoney(user.unpaidAmount)}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+      {/* View Mode Toggle */}
+      <div className="relative z-10 max-w-4xl mx-auto px-6 pt-6">
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setViewMode("users")}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+              viewMode === "users"
+                ? "bg-[#D4AF37] text-white"
+                : "bg-white text-[#2A2A2A]/70 hover:bg-[#FBF8F4]"
+            )}
+          >
+            Theo người đặt
+          </button>
+          <button
+            onClick={() => setViewMode("dishes")}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+              viewMode === "dishes"
+                ? "bg-[#D4AF37] text-white"
+                : "bg-white text-[#2A2A2A]/70 hover:bg-[#FBF8F4]"
+            )}
+          >
+            Theo món ăn
+          </button>
+        </div>
+      </div>
 
-                    {/* Summary Row */}
-                    <tr className="bg-[#FBF8F4] font-semibold">
-                      <td className="border border-[#E9D7B8]/30 p-3 sticky left-0 bg-[#FBF8F4] z-10">
-                        Tổng ngày
-                      </td>
-                      {columnTotals.map((colTotal, index) => (
-                        <td
-                          key={index}
-                          className="border border-[#E9D7B8]/30 p-3 text-center"
+      {/* Content */}
+      <div className="relative z-10 max-w-4xl mx-auto px-6 pb-6">
+        {viewMode === "users" ? (
+          // Users View
+          <div className="space-y-3">
+            {userGroups.length > 0 ? (
+              userGroups.map((group) => (
+                <UserCard
+                  key={group.userId}
+                  group={group}
+                  onTogglePaid={handleTogglePaid}
+                />
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/10 flex items-center justify-center mb-4">
+                  <span className="text-5xl">📋</span>
+                </div>
+                <p className="text-[#2A2A2A]/50 text-lg">
+                  Chưa có đơn hàng nào
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          // Dishes View
+          <div className="space-y-3">
+            {summary.length > 0 ? (
+              summary.map((item) => (
+                <div
+                  key={item.menuItemId}
+                  className="bg-white rounded-2xl border border-[#E9D7B8]/50 overflow-hidden shadow-sm"
+                >
+                  <div className="p-4 flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-[#FBF8F4] flex items-center justify-center border border-[#E9D7B8]/30 shrink-0">
+                      <span className="text-3xl">
+                        {categoryEmoji[item.menuItemCategory] || "📍"}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-[#2A2A2A]">
+                        {item.menuItemName}
+                      </h3>
+                      <p className="text-sm text-[#2A2A2A]/50">
+                        {formatMoney(item.menuItemPrice)} / món
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-[#D4AF37]">
+                        {item.totalQuantity}
+                      </p>
+                      <p className="text-sm text-[#2A2A2A]/50">
+                        {formatMoney(item.totalAmount)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Who ordered */}
+                  <div className="px-4 pb-4 pt-2 border-t border-[#E9D7B8]/30">
+                    <p className="text-xs text-[#2A2A2A]/50 mb-2">Người đặt:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {item.orders.map((order) => (
+                        <span
+                          key={order.orderId}
+                          className="px-3 py-1 rounded-full bg-[#FBF8F4] text-sm text-[#2A2A2A]/70"
                         >
-                          <div className="flex flex-col gap-1">
-                            <span className="text-sm font-bold text-[#D4AF37]">
-                              {formatMoney(colTotal.total)}
-                            </span>
-                            {colTotal.unpaid > 0 && (
-                              <span className="text-xs text-amber-600">
-                                Chưa: {formatMoney(colTotal.unpaid)}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      ))}
-                      <td className="border border-[#E9D7B8]/30 p-3 text-center bg-[#D4AF37]/10">
-                        <span className="text-xl font-bold text-[#D4AF37]">
-                          {formatMoney(totalAmount)}
+                          {order.userName}{" "}
+                          {order.quantity > 1 && `(${order.quantity})`}
                         </span>
-                      </td>
-                    </tr>
-                  </>
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="border border-[#E9D7B8]/30 p-12 text-center"
-                    >
-                      <div className="flex flex-col items-center gap-4">
-                        <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/10 flex items-center justify-center">
-                          <span className="text-5xl">📋</span>
-                        </div>
-                        <p className="text-[#2A2A2A]/50 text-lg">
-                          Chưa có đơn hàng nào trong tuần này
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/10 flex items-center justify-center mb-4">
+                  <span className="text-5xl">📋</span>
+                </div>
+                <p className="text-[#2A2A2A]/50 text-lg">
+                  Chưa có đơn hàng nào
+                </p>
+              </div>
+            )}
           </div>
-        </div>
-
-        {/* Legend */}
-        <div className="mt-4 flex items-center justify-center gap-6 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-green-50 border border-green-200" />
-            <span className="text-[#2A2A2A]/60">Đã thanh toán</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-amber-50 border border-amber-200" />
-            <span className="text-[#2A2A2A]/60">Chưa thanh toán</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-gray-50 border border-gray-200" />
-            <span className="text-[#2A2A2A]/60">Không đặt món</span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

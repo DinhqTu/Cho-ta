@@ -5,6 +5,7 @@ export interface MenuItem {
   price: number;
   image: string;
   category: string;
+  displayOrder?: number; // Order shown on UI (1-6 for dice mapping)
 }
 
 export interface Restaurant {

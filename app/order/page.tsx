@@ -27,7 +27,186 @@ import {
   Trash2,
   Check,
   ClipboardList,
+  Dices,
 } from "lucide-react";
+import dynamic from "next/dynamic";
+
+// Dynamically import 3D component to avoid SSR issues
+const Dice3DScene = dynamic(
+  () => import("@/components/dice-3d").then((mod) => mod.Dice3DScene),
+  { ssr: false }
+);
+
+// Dice Roller Component with 3D Model
+function DiceRoller({
+  menuItems,
+  onSelectItem,
+  onClose,
+}: {
+  menuItems: MenuItem[];
+  onSelectItem: (item: MenuItem) => void;
+  onClose: () => void;
+}) {
+  const [isRolling, setIsRolling] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [finalDiceNumber, setFinalDiceNumber] = useState(1);
+  const [showResult, setShowResult] = useState(false);
+
+  const startRoll = () => {
+    if (isRolling || menuItems.length === 0) return;
+
+    // Play dice rolling sound
+    try {
+      const audio = new Audio(
+        "/assets/media/Am_thanh_tieng_lac_xuc_xac-www_tiengdong_com.mp3"
+      );
+      audio.volume = 0.5;
+      audio.play().catch((err) => console.log("Audio play failed:", err));
+    } catch (err) {
+      console.log("Audio not available:", err);
+    }
+
+    setIsRolling(true);
+    setShowResult(false);
+
+    // Select random item ONCE at the beginning
+    const randomIdx = Math.floor(Math.random() * menuItems.length);
+    setSelectedIndex(randomIdx);
+
+    // Use displayOrder from the selected menu item for dice number
+    // If displayOrder is not set, fall back to (index % 6) + 1
+    const selectedItem = menuItems[randomIdx];
+    const finalDice = selectedItem.displayOrder || (randomIdx % 6) + 1;
+    setFinalDiceNumber(finalDice);
+
+    // Debug: Log menu order and selection
+    console.log("=== DICE ROLL DEBUG ===");
+    console.log("Total menu items:", menuItems.length);
+    console.log(
+      "Menu items with displayOrder:",
+      menuItems.map(
+        (item, idx) =>
+          `${idx}: ${item.name} (displayOrder: ${
+            item.displayOrder || "not set"
+          })`
+      )
+    );
+    console.log("Selected index:", randomIdx);
+    console.log("Selected item:", selectedItem?.name);
+    console.log("Selected item displayOrder:", selectedItem?.displayOrder);
+    console.log("Dice number:", finalDice);
+    console.log("=======================");
+  };
+
+  const handleRollComplete = () => {
+    setIsRolling(false);
+
+    // Show result after dice settles
+    setTimeout(() => {
+      setShowResult(true);
+      if (selectedIndex !== null) {
+        setTimeout(() => {
+          onSelectItem(menuItems[selectedIndex]);
+          onClose();
+        }, 1500);
+      }
+    }, 300);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl w-full max-w-md mx-4 shadow-2xl border border-[#E9D7B8] overflow-hidden">
+        <div className="p-6 border-b border-[#E9D7B8]/30 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Dices className="w-6 h-6 text-[#D4AF37]" />
+            <h2 className="text-xl font-bold text-[#2A2A2A]">Random Món Ăn</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-full bg-[#FBF8F4] flex items-center justify-center hover:bg-[#F5EDE3] transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-8 min-h-[500px] flex flex-col items-center justify-center relative">
+          {/* 3D Dice Animation */}
+          <div className="relative w-full h-80 mb-6">
+            <Dice3DScene
+              isRolling={isRolling}
+              finalNumber={finalDiceNumber}
+              onRollComplete={handleRollComplete}
+            />
+          </div>
+
+          {/* Selected Item Display */}
+          {showResult && selectedIndex !== null && (
+            <div className="w-full animate-[fadeIn_0.5s_ease-in-out]">
+              <div className="bg-gradient-to-br from-[#FBF8F4] to-[#F5EDE3] rounded-2xl p-6 border-2 border-[#D4AF37] shadow-lg">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-xl bg-white flex items-center justify-center shadow-md">
+                    <span className="text-4xl">
+                      {categoryEmoji[menuItems[selectedIndex].category] || "🍽️"}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg text-[#2A2A2A] mb-1">
+                      {menuItems[selectedIndex].name}
+                    </h3>
+                    <p className="text-sm text-[#2A2A2A]/60 mb-2">
+                      {menuItems[selectedIndex].description}
+                    </p>
+                    <p className="text-xl font-bold text-[#D4AF37]">
+                      {formatMoney(menuItems[selectedIndex].price)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Roll Button */}
+          {!showResult && (
+            <button
+              onClick={startRoll}
+              disabled={isRolling}
+              className={`mt-6 px-8 py-4 rounded-xl font-bold text-white transition-all shadow-lg ${
+                isRolling
+                  ? "bg-[#2A2A2A]/30 cursor-not-allowed"
+                  : "bg-[#D4AF37] hover:bg-[#C5A028] hover:scale-105"
+              }`}
+            >
+              {isRolling ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Đang lắc...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Dices className="w-5 h-5" />
+                  Lắc xúc sắc
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 // Add Item Modal
 function AddItemModal({
@@ -395,6 +574,7 @@ function TodayMenuContent() {
   const [showCart, setShowCart] = useState(false);
   const [existingOrders, setExistingOrders] = useState<DailyOrderDoc[]>([]);
   const [showExistingOrders, setShowExistingOrders] = useState(false);
+  const [showDiceRoller, setShowDiceRoller] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -402,13 +582,14 @@ function TodayMenuContent() {
       try {
         const todayMenu = await getTodayMenu();
         if (todayMenu && todayMenu.menuItems.length > 0) {
-          const items: MenuItem[] = todayMenu.menuItems.map((item) => ({
+          const items: MenuItem[] = todayMenu.menuItems.map((item, index) => ({
             id: item.id,
             name: item.name,
             description: item.description,
             price: item.price,
             category: item.category,
             image: item.image || "",
+            displayOrder: index + 1, // Visual order: 1, 2, 3, 4, 5, 6
           }));
           setMenuItems(items);
         } else {
@@ -564,6 +745,33 @@ function TodayMenuContent() {
           )}
         </div>
 
+        {/* Random Món Button Card - Featured at Top */}
+        <div className="mb-8 max-w-2xl mx-auto">
+          <div
+            className="bg-gradient-to-br from-[#D4AF37] to-[#C5A028] rounded-3xl border-2 border-[#D4AF37] overflow-hidden shadow-xl hover:shadow-2xl transition-all hover:scale-[1.02] cursor-pointer group"
+            onClick={() => setShowDiceRoller(true)}
+          >
+            <div className="p-8 flex items-center justify-between gap-6">
+              <div className="flex-1">
+                <h2 className="font-bold text-white text-2xl mb-2 flex items-center gap-2">
+                  <Dices className="w-8 h-8" />
+                  🎲 Random Món Ăn
+                </h2>
+                <p className="text-white/90 text-base mb-4">
+                  Không biết ăn gì? Để xúc sắc 3D quyết định cho bạn!
+                </p>
+                <div className="inline-flex px-6 py-3 rounded-xl bg-white/20 text-white font-bold hover:bg-white/30 transition-colors">
+                  Lắc xúc sắc ngay! 🎯
+                </div>
+              </div>
+              <div className="hidden sm:flex items-center justify-center w-32 h-32 rounded-2xl bg-white/10 group-hover:bg-white/20 transition-colors">
+                <Dices className="w-20 h-20 text-white drop-shadow-lg group-hover:rotate-12 transition-transform" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Menu Items Grid - 2 rows x 3 cols on large screens */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {menuItems.map((item) => (
             <DishCard
@@ -637,6 +845,14 @@ function TodayMenuContent() {
         <ExistingOrdersModal
           orders={existingOrders}
           onClose={() => setShowExistingOrders(false)}
+        />
+      )}
+
+      {showDiceRoller && (
+        <DiceRoller
+          menuItems={menuItems}
+          onSelectItem={(item) => setSelectedItem(item)}
+          onClose={() => setShowDiceRoller(false)}
         />
       )}
 

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dice Rolling Sound Generator</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 800px;
+        margin: 50px auto;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+      .container {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+      h1 {
+        text-align: center;
+        margin-bottom: 30px;
+        font-size: 2.5em;
+      }
+      .sound-option {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        transition: all 0.3s;
+      }
+      .sound-option:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-5px);
+      }
+      button {
+        background: linear-gradient(135deg, #d4af37 0%, #c5a028 100%);
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: bold;
+        transition: all 0.3s;
+        margin: 5px;
+      }
+      button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(212, 175, 55, 0.4);
+      }
+      button:active {
+        transform: scale(0.95);
+      }
+      .description {
+        margin: 10px 0;
+        opacity: 0.9;
+      }
+      .controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .download-btn {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🎲 Dice Sound Effects</h1>
+      <p style="text-align: center; margin-bottom: 30px">
+        Click "Play" to preview each sound, then download your favorite!
+      </p>
+
+      <div class="sound-option">
+        <h3>🎵 Option 1: Classic Dice Roll</h3>
+        <p class="description">
+          Multiple short rattling sounds that gradually slow down (2 seconds)
+        </p>
+        <div class="controls">
+          <button onclick="playSound1()">▶ Play</button>
+          <button class="download-btn" onclick="downloadSound1()">
+            ⬇ Download MP3
+          </button>
+        </div>
+      </div>
+
+      <div class="sound-option">
+        <h3>🎵 Option 2: Wooden Dice</h3>
+        <p class="description">
+          Warmer, wooden clack sounds with nice resonance (2 seconds)
+        </p>
+        <div class="controls">
+          <button onclick="playSound2()">▶ Play</button>
+          <button class="download-btn" onclick="downloadSound2()">
+            ⬇ Download MP3
+          </button>
+        </div>
+      </div>
+
+      <div class="sound-option">
+        <h3>🎵 Option 3: Casino Style</h3>
+        <p class="description">
+          Sharp, crisp dice sounds with a satisfying finish (2.5 seconds)
+        </p>
+        <div class="controls">
+          <button onclick="playSound3()">▶ Play</button>
+          <button class="download-btn" onclick="downloadSound3()">
+            ⬇ Download MP3
+          </button>
+        </div>
+      </div>
+
+      <div
+        style="
+          margin-top: 40px;
+          padding: 20px;
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+        "
+      >
+        <h3>📝 Instructions:</h3>
+        <ol>
+          <li>Click "Play" on each option to hear the sound</li>
+          <li>Choose your favorite</li>
+          <li>Click "Download MP3" to save it</li>
+          <li>Rename the file to <code>dice-roll.mp3</code></li>
+          <li>Place it in your <code>public</code> folder</li>
+        </ol>
+      </div>
+    </div>
+
+    <script>
+      // Sound Generator Functions
+      function generateDiceSound1() {
+        const audioContext = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const duration = 2;
+        const sampleRate = audioContext.sampleRate;
+        const buffer = audioContext.createBuffer(
+          1,
+          sampleRate * duration,
+          sampleRate
+        );
+        const data = buffer.getChannelData(0);
+
+        // Generate multiple dice hits that slow down
+        for (let i = 0; i < data.length; i++) {
+          const t = i / sampleRate;
+          const frequency = 15 * Math.exp(-t * 1.5); // Slowing down frequency
+          const phase = Math.floor(t * frequency);
+          const prevPhase =
+            i > 0 ? Math.floor(((i - 1) / sampleRate) * frequency) : 0;
+
+          if (phase > prevPhase) {
+            // Create a "hit" sound
+            const hitDecay = Math.exp(-t * 8);
+            data[i] = (Math.random() * 2 - 1) * 0.5 * hitDecay;
+          } else {
+            // Decay
+            data[i] = data[i - 1] * 0.92;
+          }
+        }
+
+        return buffer;
+      }
+
+      function generateDiceSound2() {
+        const audioContext = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const duration = 2;
+        const sampleRate = audioContext.sampleRate;
+        const buffer = audioContext.createBuffer(
+          1,
+          sampleRate * duration,
+          sampleRate
+        );
+        const data = buffer.getChannelData(0);
+
+        // Wooden dice - warmer, resonant sound
+        for (let i = 0; i < data.length; i++) {
+          const t = i / sampleRate;
+          const frequency = 12 * Math.exp(-t * 1.3);
+          const phase = Math.floor(t * frequency);
+          const prevPhase =
+            i > 0 ? Math.floor(((i - 1) / sampleRate) * frequency) : 0;
+
+          if (phase > prevPhase) {
+            // Wooden clack with resonance
+            const resonance = Math.sin(t * 440 * Math.PI * 2) * 0.3;
+            const noise = (Math.random() * 2 - 1) * 0.4;
+            data[i] = (noise + resonance) * Math.exp(-t * 5);
+          } else {
+            data[i] = data[i - 1] * 0.95; // Longer decay for wooden sound
+          }
+        }
+
+        return buffer;
+      }
+
+      function generateDiceSound3() {
+        const audioContext = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const duration = 2.5;
+        const sampleRate = audioContext.sampleRate;
+        const buffer = audioContext.createBuffer(
+          1,
+          sampleRate * duration,
+          sampleRate
+        );
+        const data = buffer.getChannelData(0);
+
+        // Casino style - sharp and crisp
+        for (let i = 0; i < data.length; i++) {
+          const t = i / sampleRate;
+          const frequency = 20 * Math.exp(-t * 1.8);
+          const phase = Math.floor(t * frequency);
+          const prevPhase =
+            i > 0 ? Math.floor(((i - 1) / sampleRate) * frequency) : 0;
+
+          if (phase > prevPhase) {
+            // Sharp hit
+            data[i] = (Math.random() * 2 - 1) * 0.6 * Math.exp(-t * 6);
+          } else {
+            data[i] = data[i - 1] * 0.85; // Quick decay
+          }
+
+          // Add final resonant "ting" at the end
+          if (t > 1.8) {
+            data[i] +=
+              Math.sin((t - 1.8) * 800 * Math.PI * 2) *
+              0.2 *
+              Math.exp(-(t - 1.8) * 10);
+          }
+        }
+
+        return buffer;
+      }
+
+      // Play functions
+      function playSound1() {
+        const audioContext = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const buffer = generateDiceSound1();
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start();
+      }
+
+      function playSound2() {
+        const audioContext = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const buffer = generateDiceSound2();
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start();
+      }
+
+      function playSound3() {
+        const audioContext = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const buffer = generateDiceSound3();
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start();
+      }
+
+      // WAV encoding helper
+      function encodeWAV(audioBuffer) {
+        const numChannels = 1;
+        const sampleRate = audioBuffer.sampleRate;
+        const format = 1; // PCM
+        const bitDepth = 16;
+
+        const data = audioBuffer.getChannelData(0);
+        const dataLength = data.length * 2;
+        const buffer = new ArrayBuffer(44 + dataLength);
+        const view = new DataView(buffer);
+
+        // WAV header
+        writeString(view, 0, "RIFF");
+        view.setUint32(4, 36 + dataLength, true);
+        writeString(view, 8, "WAVE");
+        writeString(view, 12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, format, true);
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, bitDepth, true);
+        writeString(view, 36, "data");
+        view.setUint32(40, dataLength, true);
+
+        // Write audio data
+        let offset = 44;
+        for (let i = 0; i < data.length; i++) {
+          const sample = Math.max(-1, Math.min(1, data[i]));
+          view.setInt16(offset, sample * 0x7fff, true);
+          offset += 2;
+        }
+
+        return buffer;
+      }
+
+      function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      }
+
+      // Download functions
+      function downloadSound(generateFunc, filename) {
+        const audioContext = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const buffer = generateFunc();
+        const wav = encodeWAV(buffer);
+        const blob = new Blob([wav], { type: "audio/wav" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function downloadSound1() {
+        downloadSound(generateDiceSound1, "dice-roll-classic.wav");
+      }
+
+      function downloadSound2() {
+        downloadSound(generateDiceSound2, "dice-roll-wooden.wav");
+      }
+
+      function downloadSound3() {
+        downloadSound(generateDiceSound3, "dice-roll-casino.wav");
+      }
+    </script>
+  </body>
+</html>
