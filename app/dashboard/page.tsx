@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { AuthGuard } from "@/components/auth-guard";
 import { Header } from "@/components/header";
 import { formatMoney } from "@/lib/utils";
@@ -46,6 +46,7 @@ function StatCard({
   icon: React.ElementType;
   color?: string;
 }) {
+  const iconStyle: React.CSSProperties = { color };
   return (
     <div className="bg-white rounded-2xl border border-[#E9D7B8]/50 p-5 shadow-sm">
       <div className="flex items-start justify-between">
@@ -60,7 +61,10 @@ function StatCard({
           className="w-12 h-12 rounded-xl flex items-center justify-center"
           style={{ backgroundColor: `${color}20` }}
         >
-          <Icon className="w-6 h-6" style={{ color }} />
+          {React.createElement(Icon, {
+            className: "w-6 h-6",
+            style: iconStyle,
+          })}
         </div>
       </div>
     </div>
