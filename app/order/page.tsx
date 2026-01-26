@@ -13,7 +13,6 @@ import {
   DailyOrderDoc,
 } from "@/lib/api/daily-orders";
 import { getTodayMenu, getTodayDate } from "@/lib/api/daily-menu";
-import { Header } from "@/components/header";
 import { ChatBox } from "@/components/chat-box";
 import { AuthGuard } from "@/components/auth-guard";
 import { categoryEmoji } from "@/lib/menu-store";
@@ -34,7 +33,7 @@ import dynamic from "next/dynamic";
 // Dynamically import 3D component to avoid SSR issues
 const Dice3DScene = dynamic(
   () => import("@/components/dice-3d").then((mod) => mod.Dice3DScene),
-  { ssr: false }
+  { ssr: false },
 );
 
 // Dice Roller Component with 3D Model
@@ -58,7 +57,7 @@ function DiceRoller({
     // Play dice rolling sound
     try {
       const audio = new Audio(
-        "/assets/media/Am_thanh_tieng_lac_xuc_xac-www_tiengdong_com.mp3"
+        "/assets/media/Am_thanh_tieng_lac_xuc_xac-www_tiengdong_com.mp3",
       );
       audio.volume = 0.5;
       audio.play().catch((err) => console.log("Audio play failed:", err));
@@ -88,8 +87,8 @@ function DiceRoller({
         (item, idx) =>
           `${idx}: ${item.name} (displayOrder: ${
             item.displayOrder || "not set"
-          })`
-      )
+          })`,
+      ),
     );
     console.log("Selected index:", randomIdx);
     console.log("Selected item:", selectedItem?.name);
@@ -334,7 +333,7 @@ function CartModal({
 }) {
   const totalAmount = orders.reduce(
     (sum, o) => sum + o.item.price * o.quantity,
-    0
+    0,
   );
 
   return (
@@ -441,7 +440,7 @@ function ExistingOrdersModal({
 }) {
   const totalAmount = orders.reduce(
     (sum, o) => sum + o.menuItemPrice * o.quantity,
-    0
+    0,
   );
   const totalItems = orders.reduce((sum, o) => sum + o.quantity, 0);
 
@@ -616,14 +615,16 @@ function TodayMenuContent() {
         if (existing) {
           if (quantity <= 0) return prev.filter((o) => o.item.id !== item.id);
           return prev.map((o) =>
-            o.item.id === item.id ? { ...o, quantity, note: note || o.note } : o
+            o.item.id === item.id
+              ? { ...o, quantity, note: note || o.note }
+              : o,
           );
         }
         if (quantity <= 0) return prev;
         return [...prev, { item, quantity, note }];
       });
     },
-    []
+    [],
   );
 
   const handleUpdateQuantity = useCallback(
@@ -632,11 +633,11 @@ function TodayMenuContent() {
         setOrders((prev) => prev.filter((o) => o.item.id !== itemId));
       } else {
         setOrders((prev) =>
-          prev.map((o) => (o.item.id === itemId ? { ...o, quantity } : o))
+          prev.map((o) => (o.item.id === itemId ? { ...o, quantity } : o)),
         );
       }
     },
-    []
+    [],
   );
 
   const handleRemoveItem = useCallback((itemId: string) => {
@@ -673,7 +674,7 @@ function TodayMenuContent() {
   const totalItems = orders.reduce((sum, o) => sum + o.quantity, 0);
   const totalAmount = orders.reduce(
     (sum, o) => sum + o.item.price * o.quantity,
-    0
+    0,
   );
   const getOrderQuantity = (itemId: string) =>
     orders.find((o) => o.item.id === itemId)?.quantity || 0;
@@ -694,7 +695,6 @@ function TodayMenuContent() {
   if (menuItems.length === 0) {
     return (
       <div className="min-h-screen bg-[#F8F4EE]">
-        <Header />
         <div className="pt-16 flex items-center justify-center min-h-[calc(100vh-4rem)]">
           <div className="text-center">
             <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/10 flex items-center justify-center mb-6">
@@ -720,8 +720,6 @@ function TodayMenuContent() {
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#D4AF37]/8 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#D4AF37]/8 rounded-full blur-3xl" />
       </div>
-
-      <Header />
 
       <div className="relative z-10 pt-20 pb-32 px-4 max-w-6xl mx-auto">
         <div className="text-center mb-8">

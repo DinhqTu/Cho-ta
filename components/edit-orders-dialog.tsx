@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cn, formatMoney } from "@/lib/utils";
 import {
-  DailyOrderDoc,
+  DailyOrderWithDetails,
   deleteDailyOrder,
   updateOrderQuantity,
 } from "@/lib/api/daily-orders";
@@ -12,13 +12,40 @@ import { Plus, Minus, X, Loader2, Trash2 } from "lucide-react";
 
 interface EditOrdersDialogProps {
   open: boolean;
-  orders: DailyOrderDoc[];
+  orders: DailyOrderWithDetails[];
   onClose: () => void;
   onUpdate: () => void;
 }
 
 interface OrderEditState {
   [orderId: string]: number;
+}
+
+// Helper function to get item name from new schema
+function getItemName(order: DailyOrderWithDetails): string {
+  if (order.menuItemDetails && order.menuItemDetails.length > 0) {
+    return order.menuItemDetails[0].name;
+  }
+  // Fallback for old schema (if still used anywhere)
+  return (order as any).menuItemName || "Món ăn";
+}
+
+// Helper function to get item category from new schema
+function getItemCategory(order: DailyOrderWithDetails): string {
+  if (order.menuItemDetails && order.menuItemDetails.length > 0) {
+    return order.menuItemDetails[0].category;
+  }
+  // Fallback for old schema
+  return (order as any).menuItemCategory || "other";
+}
+
+// Helper function to get item price from new schema
+function getItemPrice(order: DailyOrderWithDetails): number {
+  if (order.menuItemDetails && order.menuItemDetails.length > 0) {
+    return order.menuItemDetails[0].price;
+  }
+  // Fallback for old schema
+  return (order as any).menuItemPrice || 0;
 }
 
 export function EditOrdersDialog({
@@ -143,6 +170,7 @@ export function EditOrdersDialog({
           <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
             {orders.map((order) => {
               const qty = quantities[order.$id] || order.quantity;
+              const item = order.menuItemDetails[0]; // Get the single menu item
 
               return (
                 <div
@@ -152,17 +180,17 @@ export function EditOrdersDialog({
                   {/* Image */}
                   <div className="w-14 h-14 rounded-lg bg-white flex items-center justify-center border border-[#E9D7B8]/30 shrink-0">
                     <span className="text-2xl">
-                      {categoryEmoji[order.menuItemCategory] || "📍"}
+                      {categoryEmoji[item?.category] || "📍"}
                     </span>
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-[#2A2A2A]">
-                      {order.menuItemName}
+                      {item?.name || "Món ăn"}
                     </h4>
                     <p className="text-sm font-bold text-[#D4AF37] mt-0.5">
-                      {formatMoney(order.menuItemPrice)}
+                      {formatMoney(item?.price || 0)}
                     </p>
                   </div>
 
@@ -244,7 +272,7 @@ export function EditOrdersDialog({
               <p className="text-[#2A2A2A]/70 mb-4">
                 Bạn có chắc chắn muốn xóa món{" "}
                 <span className="font-semibold text-[#2A2A2A]">
-                  {deletingOrder?.menuItemName}
+                  {deletingOrder ? getItemName(deletingOrder) : ""}
                 </span>{" "}
                 khỏi đơn hàng?
               </p>
@@ -254,17 +282,17 @@ export function EditOrdersDialog({
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-lg bg-white flex items-center justify-center border border-red-200 shrink-0">
                       <span className="text-xl">
-                        {categoryEmoji[deletingOrder.menuItemCategory] || "📍"}
+                        {categoryEmoji[getItemCategory(deletingOrder)] || "📍"}
                       </span>
                     </div>
                     <div className="flex-1">
                       <h4 className="font-semibold text-[#2A2A2A]">
-                        {deletingOrder.menuItemName}
+                        {getItemName(deletingOrder)}
                       </h4>
                       <p className="text-sm text-red-600 font-medium">
                         {deletingOrder.quantity}x •{" "}
                         {formatMoney(
-                          deletingOrder.menuItemPrice * deletingOrder.quantity
+                          getItemPrice(deletingOrder) * deletingOrder.quantity,
                         )}
                       </p>
                     </div>

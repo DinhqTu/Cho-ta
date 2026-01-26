@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, use } from "react";
 import { AuthGuard } from "@/components/auth-guard";
-import { Header } from "@/components/header";
 import { formatMoney } from "@/lib/utils";
 import { getUserStats, DashboardStats } from "@/lib/api/dashboard-stats";
 import { useAuth } from "@/contexts/auth-context";
@@ -171,7 +170,7 @@ function UserDashboardContent({ userId }: { userId: string }) {
               subtitle={`${
                 stats.today.amount > 0
                   ? Math.round(
-                      (stats.today.paidAmount / stats.today.amount) * 100
+                      (stats.today.paidAmount / stats.today.amount) * 100,
                     )
                   : 0
               }%`}
@@ -394,7 +393,6 @@ export default function UserDashboardPage({
 
   return (
     <AuthGuard>
-      <Header />
       <div className="pt-16">
         <UserDashboardContent userId={userId} />
       </div>

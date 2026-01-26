@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { formatMoney } from "@/lib/utils";
 import { AdminGuard } from "@/components/auth-guard";
-import { Header } from "@/components/header";
 import { useAuth } from "@/contexts/auth-context";
 import { MenuItem } from "@/lib/menu-data";
 import { fetchMenuItems } from "@/lib/api/menu";
@@ -116,7 +115,7 @@ function DailyMenuContent() {
       const result = await createDailyMenu(
         selectedDate,
         updatedItems,
-        user.$id
+        user.$id,
       );
 
       if (result) {
@@ -147,7 +146,7 @@ function DailyMenuContent() {
 
   // Available items (not in daily menu)
   const availableItems = allMenuItems.filter(
-    (item) => !dailyMenu?.menuItems.some((di) => di.id === item.id)
+    (item) => !dailyMenu?.menuItems.some((di) => di.id === item.id),
   );
 
   // Filter items by search query and category
@@ -165,7 +164,7 @@ function DailyMenuContent() {
 
   // Get unique categories from available items
   const categories = Array.from(
-    new Set(availableItems.map((item) => item.category))
+    new Set(availableItems.map((item) => item.category)),
   ).sort();
 
   const isToday = selectedDate === getTodayDate();
@@ -380,7 +379,7 @@ function DailyMenuContent() {
                   <Plus className="w-10 h-10 text-[#D4AF37]/50 mb-2" />
                   <span className="text-[#2A2A2A]/40 text-sm">Add dish</span>
                 </button>
-              )
+              ),
             )}
           </div>
         ) : (
@@ -462,7 +461,7 @@ function DailyMenuContent() {
                   </button>
                   {categories.map((category) => {
                     const count = availableItems.filter(
-                      (item) => item.category === category
+                      (item) => item.category === category,
                     ).length;
                     return (
                       <button
@@ -554,7 +553,6 @@ function DailyMenuContent() {
 export default function DailyMenuPage() {
   return (
     <AdminGuard>
-      <Header />
       <div className="pt-16">
         <DailyMenuContent />
       </div>

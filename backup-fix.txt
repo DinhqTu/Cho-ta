@@ -1,0 +1,30 @@
+// Backup section to fix syntax issues
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {filteredMenuItems.map((item) => {
+    const isSelected = restaurantMenu.includes(item.$id);
+    return (
+      <MenuItemCard
+        key={item.$id}
+        item={{
+          id: item.$id,
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          category: item.category,
+          image: item.image,
+        }}
+        isSelected={isSelected}
+        isSelectable={true}
+        onSelect={() => {
+          if (isSelected) {
+            setRestaurantMenu(restaurantMenu.filter(id => id !== item.$id));
+          } else {
+            setRestaurantMenu([...restaurantMenu, item.$id]);
+          }
+        }}
+        layout="card"
+        showActions={false}
+      />
+    );
+  })}
+</div>

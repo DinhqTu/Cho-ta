@@ -14,9 +14,11 @@ import {
   MessageCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export function Header() {
   const { isAdmin } = useAuth();
+  const pathname = usePathname();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 px-4 py-3 bg-white/80 backdrop-blur-md border-b border-[#E9D7B8]/30">
@@ -67,7 +69,7 @@ export function Header() {
             <span className="text-sm font-medium hidden sm:block">Họp chợ</span>
           </Link>
 
-          <Link
+          {/* <Link
             href="/order"
             className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#FBF8F4] transition-colors text-[#2A2A2A]/70 hover:text-[#2A2A2A]"
           >
@@ -75,7 +77,7 @@ export function Header() {
             <span className="text-sm font-medium hidden sm:block">
               Sạp hàng
             </span>
-          </Link>
+          </Link> */}
 
           <Link
             href="/group-order"
@@ -98,6 +100,26 @@ export function Header() {
           {/* Admin only tabs */}
           {isAdmin && (
             <>
+              <Link
+                href="/dashboard"
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  pathname === "/dashboard"
+                    ? "bg-[#D4AF37] text-white"
+                    : "text-[#2A2A2A]/70 hover:text-[#2A2A2A] hover:bg-[#FBF8F4]"
+                }`}
+              >
+                📊 Dashboard
+              </Link>
+              <Link
+                href="/admin/restaurants"
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  pathname === "/admin/restaurants"
+                    ? "bg-[#D4AF37] text-white"
+                    : "text-[#2A2A2A]/70 hover:text-[#2A2A2A] hover:bg-[#FBF8F4]"
+                }`}
+              >
+                🏪 Quản lý quán
+              </Link>
               <Link
                 href="/admin/orders"
                 className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#FBF8F4] transition-colors text-[#2A2A2A]/70 hover:text-[#2A2A2A]"

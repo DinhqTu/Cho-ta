@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     if (!orderCode) {
       return NextResponse.json(
         { error: "orderCode is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
         const payments = await serverDatabases.listDocuments(
           DATABASE_ID,
           PAYOS_PAYMENTS_COLLECTION,
-          [Query.equal("orderCode", orderCode)]
+          [Query.equal("orderCode", orderCode)],
         );
 
         if (payments.documents.length > 0) {
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
                 status: "completed",
                 paidAt: new Date().toISOString(),
                 paidAmount: data.amountPaid,
-              }
+              },
             );
 
             // Cập nhật trạng thái isPaid cho các orders liên quan
@@ -66,13 +66,12 @@ export async function GET(request: NextRequest) {
                     DATABASE_ID,
                     DAILY_ORDERS_COLLECTION,
                     orderId,
-                    { isPaid: true }
+                    { isPaid: true },
                   );
-                  console.log(`Updated order ${orderId} as paid`);
                 } catch (orderError) {
                   console.error(
                     `Failed to update order ${orderId}:`,
-                    orderError
+                    orderError,
                   );
                 }
               }
@@ -103,7 +102,7 @@ export async function GET(request: NextRequest) {
     console.error("Check PayOS status error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

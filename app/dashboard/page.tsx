@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { AuthGuard } from "@/components/auth-guard";
-import { Header } from "@/components/header";
 import { formatMoney } from "@/lib/utils";
 import { getDashboardStats, DashboardStats } from "@/lib/api/dashboard-stats";
 import {
@@ -170,7 +169,7 @@ function DashboardContent() {
               subtitle={`${
                 stats.today.amount > 0
                   ? Math.round(
-                      (stats.today.paidAmount / stats.today.amount) * 100
+                      (stats.today.paidAmount / stats.today.amount) * 100,
                     )
                   : 0
               }%`}
@@ -441,7 +440,6 @@ function DashboardContent() {
 export default function DashboardPage() {
   return (
     <AuthGuard>
-      <Header />
       <div className="pt-16">
         <DashboardContent />
       </div>

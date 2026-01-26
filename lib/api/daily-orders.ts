@@ -1,5 +1,6 @@
-import { databases, DATABASE_ID, ID, Query } from "../appwrite";
+import { databases, DATABASE_ID, ID, Query, COLLECTIONS } from "../appwrite";
 import { User } from "../auth";
+import { MenuItemDoc } from "./menu";
 
 // Collection ID for daily orders
 export const DAILY_ORDERS_COLLECTION = "daily_orders";
@@ -8,48 +9,48 @@ export const DAILY_ORDERS_COLLECTION = "daily_orders";
 Schema for daily_orders collection in Appwrite:
 - $id: string (auto)
 - date: string (YYYY-MM-DD format, indexed)
-- menuItemId: string (reference to menu item)
-- menuItemName: string (denormalized for quick access)
-- menuItemPrice: number
-- menuItemCategory: string
+- restaurantId: string (reference to restaurants collection, indexed)
+- menuItemIds: array (relationship to menu_items collection)
 - userId: string (Appwrite user ID)
 - userName: string
 - userEmail: string
 - quantity: number
 - note: string (optional)
-- createdAt: string (ISO datetime)
-- updatedAt: string (ISO datetime)
+- isPaid: boolean
+- createdAt: string (ISO datetime) - Appwrite $createdAt
+- updatedAt: string (ISO datetime) - Appwrite $updatedAt
 
 Indexes to create in Appwrite Console:
 1. date (ASC) - for filtering by date
-2. date + menuItemId (ASC) - for grouping
-3. date + userId (ASC) - for user's orders
+2. date + userId (ASC) - for user's orders
+3. restaurantId (ASC) - for restaurant orders
+4. isPaid (ASC) - for payment status
 */
 
 export interface DailyOrderDoc {
   $id: string;
   $createdAt: string;
   $updatedAt: string;
-  date: string;
-  menuItemId: string;
-  menuItemName: string;
-  menuItemPrice: number;
-  menuItemCategory: string;
   userId: string;
   userName: string;
   userEmail: string;
+  menuItemId: string;
   quantity: number;
   note?: string;
-  isPaid?: boolean;
+  isPaid: boolean;
+  date: string;
+  restaurantId: string;
 }
 
 export interface DailyOrderInput {
-  menuItemId: string;
-  menuItemName: string;
-  menuItemPrice: number;
-  menuItemCategory: string;
+  restaurantId: string;
+  menuItemId: string; // Changed to single relationship
   quantity: number;
   note?: string;
+}
+
+export interface DailyOrderWithDetails extends DailyOrderDoc {
+  menuItemDetails: MenuItemDoc[]; // Keep array for consistency but will have 1 item
 }
 
 // Get today's date in YYYY-MM-DD format (local timezone)
@@ -70,56 +71,30 @@ export function formatDate(date: Date): string {
 export async function saveDailyOrder(
   user: User,
   order: DailyOrderInput,
-  date?: string
+  date?: string,
 ): Promise<DailyOrderDoc | null> {
   const orderDate = date || getTodayDate();
 
   try {
-    // Check if user already has an order for this item today
-    const existing = await databases.listDocuments(
+    // Create new order - 1 row per menu item
+
+    const doc = await databases.createDocument(
       DATABASE_ID,
       DAILY_ORDERS_COLLECTION,
-      [
-        Query.equal("date", orderDate),
-        Query.equal("userId", user.$id),
-        Query.equal("menuItemId", order.menuItemId),
-      ]
+      ID.unique(),
+      {
+        date: orderDate,
+        restaurantId: order.restaurantId,
+        menuItemId: order.menuItemId,
+        userId: user.$id,
+        userName: user.name || "Unknown",
+        userEmail: user.email,
+        quantity: order.quantity,
+        note: order.note || "",
+        isPaid: false,
+      },
     );
-
-    if (existing.documents.length > 0) {
-      // Update existing order
-      const doc = await databases.updateDocument(
-        DATABASE_ID,
-        DAILY_ORDERS_COLLECTION,
-        existing.documents[0].$id,
-        {
-          quantity: order.quantity,
-          note: order.note || "",
-        }
-      );
-      return doc as unknown as DailyOrderDoc;
-    } else {
-      // Create new order
-      const doc = await databases.createDocument(
-        DATABASE_ID,
-        DAILY_ORDERS_COLLECTION,
-        ID.unique(),
-        {
-          date: orderDate,
-          menuItemId: order.menuItemId,
-          menuItemName: order.menuItemName,
-          menuItemPrice: order.menuItemPrice,
-          menuItemCategory: order.menuItemCategory,
-          userId: user.$id,
-          userName: user.name || "Unknown",
-          userEmail: user.email,
-          quantity: order.quantity,
-          note: order.note || "",
-          isPaid: false,
-        }
-      );
-      return doc as unknown as DailyOrderDoc;
-    }
+    return doc as unknown as DailyOrderDoc;
   } catch (error) {
     console.error("Error saving daily order:", error);
     return null;
@@ -130,7 +105,7 @@ export async function saveDailyOrder(
 export async function saveDailyOrders(
   user: User,
   orders: DailyOrderInput[],
-  date?: string
+  date?: string,
 ): Promise<boolean> {
   try {
     for (const order of orders) {
@@ -144,18 +119,23 @@ export async function saveDailyOrders(
 }
 
 // Get all orders for a specific date
-export async function getDailyOrders(date?: string): Promise<DailyOrderDoc[]> {
+export async function getDailyOrders(
+  date?: string,
+  restaurantId?: string,
+): Promise<DailyOrderDoc[]> {
   const orderDate = date || getTodayDate();
 
   try {
+    const queries = [Query.equal("date", orderDate)];
+
+    if (restaurantId) {
+      queries.push(Query.equal("restaurantId", restaurantId));
+    }
+
     const response = await databases.listDocuments(
       DATABASE_ID,
       DAILY_ORDERS_COLLECTION,
-      [
-        Query.equal("date", orderDate),
-        Query.orderAsc("menuItemCategory"),
-        Query.orderAsc("menuItemName"),
-      ]
+      queries,
     );
     return response.documents as unknown as DailyOrderDoc[];
   } catch (error) {
@@ -164,10 +144,10 @@ export async function getDailyOrders(date?: string): Promise<DailyOrderDoc[]> {
   }
 }
 
-// Get orders for a specific user on a date
-export async function getUserDailyOrders(
-  userId: string,
-  date?: string
+// Get orders for a specific restaurant on a specific date
+export async function getRestaurantDailyOrders(
+  restaurantId: string,
+  date?: string,
 ): Promise<DailyOrderDoc[]> {
   const orderDate = date || getTodayDate();
 
@@ -175,7 +155,40 @@ export async function getUserDailyOrders(
     const response = await databases.listDocuments(
       DATABASE_ID,
       DAILY_ORDERS_COLLECTION,
-      [Query.equal("date", orderDate), Query.equal("userId", userId)]
+      [
+        Query.equal("date", orderDate),
+        Query.equal("restaurantId", restaurantId),
+      ],
+    );
+    return response.documents as unknown as DailyOrderDoc[];
+  } catch (error) {
+    console.error("Error fetching restaurant daily orders:", error);
+    return [];
+  }
+}
+
+// Get orders for a specific user on a date
+export async function getUserDailyOrders(
+  userId: string,
+  date?: string,
+  restaurantId?: string,
+): Promise<DailyOrderDoc[]> {
+  const orderDate = date || getTodayDate();
+
+  try {
+    const queries = [
+      Query.equal("date", orderDate),
+      Query.equal("userId", userId),
+    ];
+
+    if (restaurantId) {
+      queries.push(Query.equal("restaurantId", restaurantId));
+    }
+
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      DAILY_ORDERS_COLLECTION,
+      queries,
     );
     return response.documents as unknown as DailyOrderDoc[];
   } catch (error) {
@@ -184,17 +197,108 @@ export async function getUserDailyOrders(
   }
 }
 
+// Get all orders for a date with menu item details
+export async function getAllDailyOrdersWithDetails(
+  date?: string,
+  restaurantId?: string,
+): Promise<DailyOrderWithDetails[]> {
+  const orderDate = date || getTodayDate();
+
+  try {
+    const queries = [Query.equal("date", orderDate)];
+
+    if (restaurantId) {
+      queries.push(Query.equal("restaurantId", restaurantId));
+    }
+
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      DAILY_ORDERS_COLLECTION,
+      queries,
+    );
+
+    const orders = response.documents as unknown as DailyOrderDoc[];
+
+    // Process each order to fetch menu item details
+    const ordersWithDetails = await Promise.all(
+      orders.map(async (order) => {
+        let menuItemDetails: MenuItemDoc[] = [];
+
+        if (order.menuItemId) {
+          try {
+            // Fetch single menu item by ID
+            const menuItemResponse = await databases.getDocument(
+              DATABASE_ID,
+              COLLECTIONS.MENU_ITEMS,
+              order.menuItemId,
+            );
+            menuItemDetails = [menuItemResponse as unknown as MenuItemDoc];
+          } catch (e) {
+            console.error("Error fetching menu item details:", e);
+          }
+        }
+
+        return {
+          ...order,
+          menuItemDetails,
+        };
+      }),
+    );
+
+    return ordersWithDetails;
+  } catch (error) {
+    console.error("Error fetching all daily orders with details:", error);
+    return [];
+  }
+}
+
+export async function getUserDailyOrdersWithDetails(
+  userId: string,
+  date?: string,
+  restaurantId?: string,
+): Promise<DailyOrderWithDetails[]> {
+  const orderDate = date || getTodayDate();
+
+  try {
+    const queries = [
+      Query.equal("date", orderDate),
+      Query.equal("userId", userId),
+      Query.select(["*", "menuItemId.*"]),
+    ];
+
+    if (restaurantId) {
+      queries.push(Query.equal("restaurantId", restaurantId));
+    }
+
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      DAILY_ORDERS_COLLECTION,
+      queries,
+    );
+
+    const orders = response.documents as unknown as DailyOrderDoc[];
+
+    return orders.map((order: any) => ({
+      ...order,
+      menuItemDetails: order.menuItemId ? [order.menuItemId] : [], // Single item in array
+    }));
+  } catch (error) {
+    console.error("Error fetching user daily orders with details:", error);
+    return [];
+  }
+}
+
 // Update payment status
 export async function updateOrderPaymentStatus(
   orderId: string,
-  isPaid: boolean
+  isPaid: boolean,
 ): Promise<boolean> {
   try {
     await databases.updateDocument(
       DATABASE_ID,
       DAILY_ORDERS_COLLECTION,
       orderId,
-      { isPaid }
+      { isPaid },
     );
     return true;
   } catch (error) {
@@ -206,18 +310,43 @@ export async function updateOrderPaymentStatus(
 // Update order quantity
 export async function updateOrderQuantity(
   orderId: string,
-  quantity: number
+  quantity: number,
 ): Promise<boolean> {
   try {
     await databases.updateDocument(
       DATABASE_ID,
       DAILY_ORDERS_COLLECTION,
       orderId,
-      { quantity }
+      { quantity },
     );
     return true;
   } catch (error) {
     console.error("Error updating order quantity:", error);
+    return false;
+  }
+}
+
+// Update order with quantity and note
+export async function updateOrder(
+  orderId: string,
+  quantity: number,
+  note?: string,
+): Promise<boolean> {
+  try {
+    const updateData: any = { quantity };
+    if (note !== undefined) {
+      updateData.note = note;
+    }
+
+    await databases.updateDocument(
+      DATABASE_ID,
+      DAILY_ORDERS_COLLECTION,
+      orderId,
+      updateData,
+    );
+    return true;
+  } catch (error) {
+    console.error("Error updating order:", error);
     return false;
   }
 }
@@ -228,7 +357,7 @@ export async function deleteDailyOrder(orderId: string): Promise<boolean> {
     await databases.deleteDocument(
       DATABASE_ID,
       DAILY_ORDERS_COLLECTION,
-      orderId
+      orderId,
     );
     return true;
   } catch (error) {
@@ -240,7 +369,7 @@ export async function deleteDailyOrder(orderId: string): Promise<boolean> {
 // Delete all orders for a user on a specific date
 export async function deleteUserDailyOrders(
   userId: string,
-  date?: string
+  date?: string,
 ): Promise<boolean> {
   const orderDate = date || getTodayDate();
 
@@ -250,7 +379,7 @@ export async function deleteUserDailyOrders(
       await databases.deleteDocument(
         DATABASE_ID,
         DAILY_ORDERS_COLLECTION,
-        order.$id
+        order.$id,
       );
     }
     return true;
@@ -263,9 +392,7 @@ export async function deleteUserDailyOrders(
 // Get summary of orders grouped by menu item for a date
 export interface DailyOrderSummary {
   menuItemId: string;
-  menuItemName: string;
-  menuItemPrice: number;
-  menuItemCategory: string;
+  menuItemDetails: MenuItemDoc[];
   totalQuantity: number;
   totalAmount: number;
   orders: {
@@ -278,18 +405,42 @@ export interface DailyOrderSummary {
 }
 
 export async function getDailyOrderSummary(
-  date?: string
+  date?: string,
+  restaurantId?: string,
 ): Promise<DailyOrderSummary[]> {
-  const orders = await getDailyOrders(date);
+  const orders = await getDailyOrders(date, restaurantId);
 
   const summaryMap = new Map<string, DailyOrderSummary>();
 
   for (const order of orders) {
-    const existing = summaryMap.get(order.menuItemId);
+    // Use menuItemId as key
+    const key = order.menuItemId;
+    const existing = summaryMap.get(key);
+
+    // Fetch menu item details for this order
+    let menuItemDetails: MenuItemDoc[] = [];
+    if (order.menuItemId) {
+      try {
+        const menuItemResponse = await databases.getDocument(
+          DATABASE_ID,
+          COLLECTIONS.MENU_ITEMS,
+          order.menuItemId,
+        );
+        menuItemDetails = [menuItemResponse as unknown as MenuItemDoc];
+      } catch (e) {
+        console.error("Error fetching menu item details:", e);
+      }
+    }
+
+    // Calculate total amount from menu item prices
+    const totalAmount = menuItemDetails.reduce(
+      (sum, item) => sum + (item.price || 0) * order.quantity,
+      0,
+    );
 
     if (existing) {
       existing.totalQuantity += order.quantity;
-      existing.totalAmount += order.quantity * order.menuItemPrice;
+      existing.totalAmount += totalAmount;
       existing.orders.push({
         orderId: order.$id,
         userId: order.userId,
@@ -298,13 +449,11 @@ export async function getDailyOrderSummary(
         note: order.note,
       });
     } else {
-      summaryMap.set(order.menuItemId, {
+      summaryMap.set(key, {
         menuItemId: order.menuItemId,
-        menuItemName: order.menuItemName,
-        menuItemPrice: order.menuItemPrice,
-        menuItemCategory: order.menuItemCategory,
+        menuItemDetails,
         totalQuantity: order.quantity,
-        totalAmount: order.quantity * order.menuItemPrice,
+        totalAmount,
         orders: [
           {
             orderId: order.$id,
@@ -319,7 +468,7 @@ export async function getDailyOrderSummary(
   }
 
   return Array.from(summaryMap.values()).sort(
-    (a, b) => b.totalQuantity - a.totalQuantity
+    (a, b) => b.totalQuantity - a.totalQuantity,
   );
 }
 
@@ -331,18 +480,25 @@ export interface UnpaidOrdersByDate {
 }
 
 export async function getUserUnpaidOrders(
-  userId: string
+  userId: string,
+  restaurantId?: string,
 ): Promise<UnpaidOrdersByDate[]> {
   try {
+    const queries = [
+      Query.equal("userId", userId),
+      Query.equal("isPaid", false),
+      Query.orderDesc("date"),
+      Query.limit(100),
+    ];
+
+    if (restaurantId) {
+      queries.push(Query.equal("restaurantId", restaurantId));
+    }
+
     const response = await databases.listDocuments(
       DATABASE_ID,
       DAILY_ORDERS_COLLECTION,
-      [
-        Query.equal("userId", userId),
-        Query.equal("isPaid", false),
-        Query.orderDesc("date"),
-        Query.limit(100),
-      ]
+      queries,
     );
 
     const orders = response.documents as unknown as DailyOrderDoc[];
@@ -358,15 +514,36 @@ export async function getUserUnpaidOrders(
       }
     }
 
-    // Convert to array with totals
-    return Array.from(dateMap.entries()).map(([date, dateOrders]) => ({
-      date,
-      orders: dateOrders,
-      totalAmount: dateOrders.reduce(
-        (sum, o) => sum + o.menuItemPrice * o.quantity,
-        0
-      ),
-    }));
+    // Convert to array with totals - need to fetch menu item details for pricing
+    return await Promise.all(
+      Array.from(dateMap.entries()).map(async ([date, dateOrders]) => {
+        let totalAmount = 0;
+
+        // Calculate total amount by fetching menu item details
+        for (const order of dateOrders) {
+          if (order.menuItemId) {
+            try {
+              const menuItemResponse = await databases.getDocument(
+                DATABASE_ID,
+                COLLECTIONS.MENU_ITEMS,
+                order.menuItemId,
+              );
+              const menuItem = menuItemResponse as unknown as MenuItemDoc;
+              const orderTotal = (menuItem.price || 0) * order.quantity;
+              totalAmount += orderTotal;
+            } catch (e) {
+              console.error("Error calculating order total:", e);
+            }
+          }
+        }
+
+        return {
+          date,
+          orders: dateOrders,
+          totalAmount,
+        };
+      }),
+    );
   } catch (error) {
     console.error("Error fetching user unpaid orders:", error);
     return [];
@@ -383,9 +560,12 @@ export interface DailyStats {
   topItems: { name: string; quantity: number }[];
 }
 
-export async function getDailyStats(date?: string): Promise<DailyStats> {
+export async function getDailyStats(
+  date?: string,
+  restaurantId?: string,
+): Promise<DailyStats> {
   const orderDate = date || getTodayDate();
-  const orders = await getDailyOrders(orderDate);
+  const orders = await getDailyOrders(orderDate, restaurantId);
 
   const userIds = new Set<string>();
   const itemCounts = new Map<string, { name: string; quantity: number }>();
@@ -395,21 +575,39 @@ export async function getDailyStats(date?: string): Promise<DailyStats> {
   for (const order of orders) {
     userIds.add(order.userId);
     totalItems += order.quantity;
-    totalAmount += order.quantity * order.menuItemPrice;
 
-    const existing = itemCounts.get(order.menuItemId);
-    if (existing) {
-      existing.quantity += order.quantity;
-    } else {
-      itemCounts.set(order.menuItemId, {
-        name: order.menuItemName,
-        quantity: order.quantity,
-      });
+    // Fetch menu item details to calculate price and get name
+    if (order.menuItemId) {
+      try {
+        const menuItemResponse = await databases.getDocument(
+          DATABASE_ID,
+          COLLECTIONS.MENU_ITEMS,
+          order.menuItemId,
+        );
+        const menuItem = menuItemResponse as unknown as MenuItemDoc;
+
+        // Calculate total amount for this order
+        const orderTotal = (menuItem.price || 0) * order.quantity;
+        totalAmount += orderTotal;
+
+        // Update item counts for top items
+        const existing = itemCounts.get(menuItem.$id);
+        if (existing) {
+          existing.quantity += order.quantity;
+        } else {
+          itemCounts.set(menuItem.$id, {
+            name: menuItem.name,
+            quantity: order.quantity,
+          });
+        }
+      } catch (e) {
+        console.error("Error fetching menu items for stats:", e);
+      }
     }
   }
 
   const topItems = Array.from(itemCounts.values())
-    .sort((a, b) => b.quantity - a.quantity)
+    .sort((a: any, b: any) => b.quantity - a.quantity)
     .slice(0, 3);
 
   return {

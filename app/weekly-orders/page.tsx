@@ -3,14 +3,16 @@
 import { useState, useEffect } from "react";
 import { cn, formatMoney } from "@/lib/utils";
 import { AuthGuard } from "@/components/auth-guard";
-import { Header } from "@/components/header";
 import { useAuth } from "@/contexts/auth-context";
 import {
   getDailyOrders,
   DailyOrderDoc,
   getTodayDate,
   updateOrderPaymentStatus,
+  getAllDailyOrdersWithDetails,
+  DailyOrderWithDetails,
 } from "@/lib/api/daily-orders";
+import { MenuItemDoc } from "@/lib/api/menu";
 import {
   Calendar,
   ChevronLeft,
@@ -70,20 +72,21 @@ interface UserWeeklySummary {
   userId: string;
   userName: string;
   userEmail: string;
-  dailyOrders: Map<string, DailyOrderDoc[]>;
+  dailyOrders: Map<string, DailyOrderWithDetails[]>;
   totalAmount: number;
   paidAmount: number;
   unpaidAmount: number;
 }
 
 function groupWeeklyOrdersByUser(
-  ordersByDate: Map<string, DailyOrderDoc[]>
+  ordersByDate: Map<string, DailyOrderWithDetails[]>,
 ): UserWeeklySummary[] {
   const userMap = new Map<string, UserWeeklySummary>();
 
   ordersByDate.forEach((orders, date) => {
     orders.forEach((order) => {
-      const amount = order.menuItemPrice * order.quantity;
+      const menuItem = order.menuItemDetails[0];
+      const amount = menuItem.price * order.quantity;
       const existing = userMap.get(order.userId);
 
       if (existing) {
@@ -97,7 +100,7 @@ function groupWeeklyOrdersByUser(
           existing.unpaidAmount += amount;
         }
       } else {
-        const dailyOrders = new Map<string, DailyOrderDoc[]>();
+        const dailyOrders = new Map<string, DailyOrderWithDetails[]>();
         dailyOrders.set(date, [order]);
         userMap.set(order.userId, {
           userId: order.userId,
@@ -113,7 +116,7 @@ function groupWeeklyOrdersByUser(
   });
 
   return Array.from(userMap.values()).sort((a, b) =>
-    a.userName.localeCompare(b.userName)
+    a.userName.localeCompare(b.userName),
   );
 }
 
@@ -123,12 +126,13 @@ function OrderCard({
   onTogglePaid,
   isAdmin = false,
 }: {
-  order: DailyOrderDoc;
+  order: DailyOrderWithDetails;
   onTogglePaid: (orderId: string, isPaid: boolean) => void;
   isAdmin?: boolean;
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const menuItem = order.menuItemDetails[0];
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -148,18 +152,18 @@ function OrderCard({
         order.isPaid
           ? "bg-green-50 border-green-200"
           : "bg-amber-50 border-amber-200",
-        isHovered && "shadow-md"
+        isHovered && "shadow-md",
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="flex items-center gap-2">
         <span className="text-lg">
-          {categoryEmoji[order.menuItemCategory] || "📍"}
+          {categoryEmoji[menuItem.category] || "📍"}
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-[#2A2A2A] truncate">
-            {order.menuItemName}
+            {menuItem.name}
           </p>
           <p className="text-xs text-[#2A2A2A]/50">x{order.quantity}</p>
         </div>
@@ -176,7 +180,7 @@ function OrderCard({
               order.isPaid
                 ? "bg-amber-500 text-white hover:bg-amber-600"
                 : "bg-green-500 text-white hover:bg-green-600",
-              isUpdating && "opacity-50 cursor-not-allowed"
+              isUpdating && "opacity-50 cursor-not-allowed",
             )}
           >
             {isUpdating ? (
@@ -203,7 +207,7 @@ function TableCell({
   onTogglePaid,
   isAdmin = false,
 }: {
-  orders: DailyOrderDoc[];
+  orders: DailyOrderWithDetails[];
   onTogglePaid: (orderId: string, isPaid: boolean) => void;
   isAdmin?: boolean;
 }) {
@@ -216,12 +220,12 @@ function TableCell({
   }
 
   const totalAmount = orders.reduce(
-    (sum, o) => sum + o.menuItemPrice * o.quantity,
-    0
+    (sum, o) => sum + o.menuItemDetails[0].price * o.quantity,
+    0,
   );
   const paidAmount = orders
     .filter((o) => o.isPaid)
-    .reduce((sum, o) => sum + o.menuItemPrice * o.quantity, 0);
+    .reduce((sum, o) => sum + o.menuItemDetails[0].price * o.quantity, 0);
   const unpaidAmount = totalAmount - paidAmount;
   const allPaid = unpaidAmount === 0;
 
@@ -229,7 +233,7 @@ function TableCell({
     <td
       className={cn(
         "border border-[#E9D7B8]/30 p-3 min-w-[180px] align-top",
-        allPaid ? "bg-green-50/30" : "bg-amber-50/30"
+        allPaid ? "bg-green-50/30" : "bg-amber-50/30",
       )}
     >
       <div className="space-y-2">
@@ -244,13 +248,12 @@ function TableCell({
         ))}
 
         {/* Summary */}
-        <div
+        {/* <div
           className={cn(
             "pt-2 border-t space-y-1",
-            allPaid ? "border-green-200" : "border-amber-200"
+            allPaid ? "border-green-200" : "border-amber-200",
           )}
-        >
-          {/* Show paid amount if any */}
+        > 
           {paidAmount > 0 && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
@@ -265,7 +268,6 @@ function TableCell({
             </div>
           )}
 
-          {/* Show unpaid amount if any */}
           {unpaidAmount > 0 && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
@@ -279,7 +281,7 @@ function TableCell({
               </span>
             </div>
           )}
-        </div>
+        </div> */}
       </div>
     </td>
   );
@@ -288,10 +290,10 @@ function TableCell({
 function WeeklyOrdersContent() {
   const { isAdmin } = useAuth();
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(
-    getMonday(new Date())
+    getMonday(new Date()),
   );
   const [ordersByDate, setOrdersByDate] = useState<
-    Map<string, DailyOrderDoc[]>
+    Map<string, DailyOrderWithDetails[]>
   >(new Map());
   const [isLoading, setIsLoading] = useState(true);
 
@@ -301,12 +303,12 @@ function WeeklyOrdersContent() {
   const loadWeekData = async () => {
     setIsLoading(true);
     try {
-      const ordersMap = new Map<string, DailyOrderDoc[]>();
+      const ordersMap = new Map<string, DailyOrderWithDetails[]>();
       await Promise.all(
         weekdayDates.map(async (date) => {
-          const orders = await getDailyOrders(date);
+          const orders = await getAllDailyOrdersWithDetails(date);
           ordersMap.set(date, orders);
-        })
+        }),
       );
       setOrdersByDate(ordersMap);
     } catch (error) {
@@ -341,7 +343,7 @@ function WeeklyOrdersContent() {
       const newMap = new Map(prev);
       newMap.forEach((orders, date) => {
         const updatedOrders = orders.map((o) =>
-          o.$id === orderId ? { ...o, isPaid } : o
+          o.$id === orderId ? { ...o, isPaid } : o,
         );
         newMap.set(date, updatedOrders);
       });
@@ -355,12 +357,12 @@ function WeeklyOrdersContent() {
   const columnTotals = weekdayDates.map((date) => {
     const orders = ordersByDate.get(date) || [];
     const total = orders.reduce(
-      (sum, o) => sum + o.menuItemPrice * o.quantity,
-      0
+      (sum, o) => sum + o.menuItemDetails[0].price * o.quantity,
+      0,
     );
     const paid = orders
       .filter((o) => o.isPaid)
-      .reduce((sum, o) => sum + o.menuItemPrice * o.quantity, 0);
+      .reduce((sum, o) => sum + o.menuItemDetails[0].price * o.quantity, 0);
     return { total, paid, unpaid: total - paid };
   });
 
@@ -372,7 +374,7 @@ function WeeklyOrdersContent() {
   ordersByDate.forEach((orders) => {
     orders.forEach((order) => {
       totalOrders += order.quantity;
-      const amount = order.menuItemPrice * order.quantity;
+      const amount = order.menuItemDetails[0].price * order.quantity;
       totalAmount += amount;
       if (order.isPaid) {
         paidAmount += amount;
@@ -559,11 +561,11 @@ function WeeklyOrdersContent() {
                             <span className="text-lg font-bold text-[#D4AF37]">
                               {formatMoney(user.totalAmount)}
                             </span>
-                            {user.unpaidAmount > 0 && (
+                            {/* {user.unpaidAmount > 0 && (
                               <span className="text-xs text-amber-600">
                                 Còn {formatMoney(user.unpaidAmount)}
                               </span>
-                            )}
+                            )} */}
                           </div>
                         </td>
                       </tr>
@@ -583,11 +585,11 @@ function WeeklyOrdersContent() {
                             <span className="text-sm font-bold text-[#D4AF37]">
                               {formatMoney(colTotal.total)}
                             </span>
-                            {colTotal.unpaid > 0 && (
+                            {/* {colTotal.unpaid > 0 && (
                               <span className="text-xs text-amber-600">
                                 Chưa: {formatMoney(colTotal.unpaid)}
                               </span>
-                            )}
+                            )} */}
                           </div>
                         </td>
                       ))}
@@ -643,7 +645,6 @@ function WeeklyOrdersContent() {
 export default function WeeklyOrdersPage() {
   return (
     <AuthGuard>
-      <Header />
       <div className="pt-16">
         <WeeklyOrdersContent />
       </div>

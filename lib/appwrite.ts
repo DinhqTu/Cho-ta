@@ -20,6 +20,8 @@ export const COLLECTIONS = {
   MENU_ITEMS: "menu_items",
   ORDERS: "orders",
   ORDER_ITEMS: "order_items",
+  RESTAURANTS: "restaurants",
+  DAILY_MENUS: "daily_menus",
 };
 
 export { ID, Query, client };

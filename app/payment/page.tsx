@@ -49,7 +49,7 @@ function PaymentContent() {
         const allOrders = await getDailyOrders(date);
         // Filter only current user's unpaid orders
         const userUnpaidOrders = allOrders.filter(
-          (o) => o.userId === user.$id && !o.isPaid
+          (o) => o.userId === user.$id && !o.isPaid,
         );
         setOrders(userUnpaidOrders);
       } catch (error) {
@@ -64,7 +64,7 @@ function PaymentContent() {
 
   const totalAmount = orders.reduce(
     (sum, o) => sum + o.menuItemPrice * o.quantity,
-    0
+    0,
   );
 
   const handleSelectMethod = (method: PaymentMethod) => {

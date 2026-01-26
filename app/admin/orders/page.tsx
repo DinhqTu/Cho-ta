@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { cn, formatMoney } from "@/lib/utils";
 import { AdminGuard } from "@/components/auth-guard";
-import { Header } from "@/components/header";
 import {
   getDailyOrders,
   getDailyOrderSummary,
@@ -46,7 +45,8 @@ function groupOrdersByUser(orders: DailyOrderDoc[]): UserOrderGroup[] {
   const userMap = new Map<string, UserOrderGroup>();
 
   for (const order of orders) {
-    const amount = order.menuItemPrice * order.quantity;
+    // Temporary fix: use placeholder amount until menu items are fetched
+    const amount = 0; // TODO: Implement proper calculation with menu item details
     const existing = userMap.get(order.userId);
 
     if (existing) {
@@ -73,7 +73,7 @@ function groupOrdersByUser(orders: DailyOrderDoc[]): UserOrderGroup[] {
   }
 
   return Array.from(userMap.values()).sort((a, b) =>
-    a.userName.localeCompare(b.userName)
+    a.userName.localeCompare(b.userName),
   );
 }
 
@@ -164,12 +164,13 @@ function UserCard({
               key={order.$id}
               className={cn(
                 "flex items-center gap-3 p-3 rounded-xl transition-colors",
-                order.isPaid ? "bg-green-50" : "bg-[#FBF8F4]"
+                order.isPaid ? "bg-green-50" : "bg-[#FBF8F4]",
               )}
             >
               <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center border border-[#E9D7B8]/30 shrink-0">
                 <span className="text-xl">
-                  {categoryEmoji[order.menuItemCategory] || "📍"}
+                  {categoryEmoji["unknown"] || "📍"}{" "}
+                  {/* TODO: Fetch from menu item details */}
                 </span>
               </div>
 
@@ -179,7 +180,7 @@ function UserCard({
                     {order.quantity}x
                   </span>
                   <h4 className="font-medium text-[#2A2A2A] truncate">
-                    {order.menuItemName}
+                    {"Menu Item"} {/* TODO: Fetch from menu item details */}
                   </h4>
                 </div>
                 {order.note && (
@@ -188,7 +189,8 @@ function UserCard({
                   </p>
                 )}
                 <p className="text-sm font-semibold text-[#D4AF37] mt-1">
-                  {formatMoney(order.menuItemPrice * order.quantity)}
+                  {formatMoney(0)}{" "}
+                  {/* TODO: Calculate from menu item details */}
                 </p>
               </div>
 
@@ -203,7 +205,7 @@ function UserCard({
                   order.isPaid
                     ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
                     : "bg-green-100 text-green-700 hover:bg-green-200",
-                  updatingId === order.$id && "opacity-50"
+                  updatingId === order.$id && "opacity-50",
                 )}
               >
                 {updatingId === order.$id ? (
@@ -271,19 +273,15 @@ function AdminOrdersContent() {
 
   const handleTogglePaid = (orderId: string, isPaid: boolean) => {
     setOrders((prev) =>
-      prev.map((o) => (o.$id === orderId ? { ...o, isPaid } : o))
+      prev.map((o) => (o.$id === orderId ? { ...o, isPaid } : o)),
     );
   };
 
   const userGroups = groupOrdersByUser(orders);
-  const totalAmount = orders.reduce(
-    (sum, o) => sum + o.menuItemPrice * o.quantity,
-    0
-  );
+  // TODO: Calculate actual amounts from menu item details
+  const totalAmount = 0;
   const totalItems = orders.reduce((sum, o) => sum + o.quantity, 0);
-  const paidAmount = orders
-    .filter((o) => o.isPaid)
-    .reduce((sum, o) => sum + o.menuItemPrice * o.quantity, 0);
+  const paidAmount = 0;
 
   const isToday = selectedDate === getTodayDate();
 
@@ -393,7 +391,7 @@ function AdminOrdersContent() {
               "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
               viewMode === "users"
                 ? "bg-[#D4AF37] text-white"
-                : "bg-white text-[#2A2A2A]/70 hover:bg-[#FBF8F4]"
+                : "bg-white text-[#2A2A2A]/70 hover:bg-[#FBF8F4]",
             )}
           >
             Theo người đặt
@@ -404,7 +402,7 @@ function AdminOrdersContent() {
               "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
               viewMode === "dishes"
                 ? "bg-[#D4AF37] text-white"
-                : "bg-white text-[#2A2A2A]/70 hover:bg-[#FBF8F4]"
+                : "bg-white text-[#2A2A2A]/70 hover:bg-[#FBF8F4]",
             )}
           >
             Theo món ăn
@@ -427,7 +425,7 @@ function AdminOrdersContent() {
               ))
             ) : (
               <div className="text-center py-12">
-                <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/10 flex items-center justify-center mb-4">
+                <div className="w-24 h-24 mx-auto rounded-2xl bg-linear-to-br from-[#D4AF37]/20 to-[#D4AF37]/10 flex items-center justify-center mb-4">
                   <span className="text-5xl">📋</span>
                 </div>
                 <p className="text-[#2A2A2A]/50 text-lg">
@@ -448,15 +446,17 @@ function AdminOrdersContent() {
                   <div className="p-4 flex items-center gap-4">
                     <div className="w-14 h-14 rounded-xl bg-[#FBF8F4] flex items-center justify-center border border-[#E9D7B8]/30 shrink-0">
                       <span className="text-3xl">
-                        {categoryEmoji[item.menuItemCategory] || "📍"}
+                        {categoryEmoji["unknown"] || "📍"}{" "}
+                        {/* TODO: Use menuItemDetails */}
                       </span>
                     </div>
                     <div className="flex-1">
                       <h3 className="font-semibold text-[#2A2A2A]">
-                        {item.menuItemName}
+                        {"Menu Items"} {/* TODO: Use menuItemDetails */}
                       </h3>
                       <p className="text-sm text-[#2A2A2A]/50">
-                        {formatMoney(item.menuItemPrice)} / món
+                        {formatMoney(0)} / món{" "}
+                        {/* TODO: Calculate from menuItemDetails */}
                       </p>
                     </div>
                     <div className="text-right">
@@ -488,7 +488,7 @@ function AdminOrdersContent() {
               ))
             ) : (
               <div className="text-center py-12">
-                <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/10 flex items-center justify-center mb-4">
+                <div className="w-24 h-24 mx-auto rounded-2xl bg-linear-to-br from-[#D4AF37]/20 to-[#D4AF37]/10 flex items-center justify-center mb-4">
                   <span className="text-5xl">📋</span>
                 </div>
                 <p className="text-[#2A2A2A]/50 text-lg">
@@ -506,7 +506,6 @@ function AdminOrdersContent() {
 export default function AdminOrdersPage() {
   return (
     <AdminGuard>
-      <Header />
       <div className="pt-16">
         <AdminOrdersContent />
       </div>

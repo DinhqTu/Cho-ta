@@ -49,7 +49,6 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
 
   try {
     const registration = await navigator.serviceWorker.register("/sw.js");
-    console.log("Service Worker registered:", registration);
     return registration;
   } catch (error) {
     console.error("Service Worker registration failed:", error);
@@ -114,7 +113,7 @@ export async function getSubscription(): Promise<PushSubscription | null> {
 export function showLocalNotification(
   title: string,
   body: string,
-  url?: string
+  url?: string,
 ): void {
   if (Notification.permission !== "granted") return;
 

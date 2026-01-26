@@ -11,7 +11,6 @@ import {
 } from "@/lib/api/menu";
 import { categoryEmoji, menuCategories } from "@/lib/menu-store";
 import { AdminGuard } from "@/components/auth-guard";
-import { Header } from "@/components/header";
 import {
   Plus,
   Pencil,
@@ -160,7 +159,7 @@ function MenuItemCard({
     <div
       className={cn(
         "flex items-center gap-4 p-4 bg-white rounded-xl border border-[#E9D7B8]/50 hover:border-[#D4AF37]/50 transition-colors",
-        isDeleting && "opacity-50"
+        isDeleting && "opacity-50",
       )}
     >
       <div className="w-14 h-14 rounded-xl bg-linear-to-br from-[#FBF8F4] to-[#F5EDE3] flex items-center justify-center border border-[#E9D7B8]/30 shrink-0">
@@ -260,8 +259,8 @@ function AdminMenuContent() {
       if (success) {
         setMenuItems((prev) =>
           prev.map((item) =>
-            item.id === editingItem.id ? { ...item, ...data } : item
-          )
+            item.id === editingItem.id ? { ...item, ...data } : item,
+          ),
         );
         setEditingItem(null);
       } else {
@@ -295,11 +294,14 @@ function AdminMenuContent() {
   };
 
   // Group by category
-  const groupedItems = menuItems.reduce((acc, item) => {
-    if (!acc[item.category]) acc[item.category] = [];
-    acc[item.category].push(item);
-    return acc;
-  }, {} as Record<string, MenuItem[]>);
+  const groupedItems = menuItems.reduce(
+    (acc, item) => {
+      if (!acc[item.category]) acc[item.category] = [];
+      acc[item.category].push(item);
+      return acc;
+    },
+    {} as Record<string, MenuItem[]>,
+  );
 
   if (isLoading) {
     return (
@@ -470,7 +472,6 @@ function AdminMenuContent() {
 export default function AdminMenuPage() {
   return (
     <AdminGuard>
-      <Header />
       <div className="pt-16">
         <AdminMenuContent />
       </div>

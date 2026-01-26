@@ -4,11 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { cn, formatMoney } from "@/lib/utils";
 import { AuthGuard } from "@/components/auth-guard";
-import { Header } from "@/components/header";
 import { useAuth } from "@/contexts/auth-context";
 import {
   getDailyOrders,
+  getAllDailyOrdersWithDetails,
   DailyOrderDoc,
+  DailyOrderWithDetails,
   getTodayDate,
   updateOrderPaymentStatus,
 } from "@/lib/api/daily-orders";
@@ -33,20 +34,24 @@ interface UserOrderGroup {
   userId: string;
   userName: string;
   userEmail: string;
-  orders: DailyOrderDoc[];
+  orders: DailyOrderWithDetails[];
   totalAmount: number;
   totalItems: number;
   allPaid: boolean;
 }
 
-function groupOrdersByUser(orders: DailyOrderDoc[]): UserOrderGroup[] {
+function groupOrdersByUser(orders: DailyOrderWithDetails[]): UserOrderGroup[] {
   const userMap = new Map<string, UserOrderGroup>();
 
   for (const order of orders) {
+    // Calculate total amount from single menu item
+    const item = order.menuItemDetails[0];
+    const orderAmount = (item?.price || 0) * order.quantity;
+
     const existing = userMap.get(order.userId);
     if (existing) {
       existing.orders.push(order);
-      existing.totalAmount += order.menuItemPrice * order.quantity;
+      existing.totalAmount += orderAmount;
       existing.totalItems += order.quantity;
       if (!order.isPaid) existing.allPaid = false;
     } else {
@@ -55,7 +60,7 @@ function groupOrdersByUser(orders: DailyOrderDoc[]): UserOrderGroup[] {
         userName: order.userName,
         userEmail: order.userEmail,
         orders: [order],
-        totalAmount: order.menuItemPrice * order.quantity,
+        totalAmount: orderAmount,
         totalItems: order.quantity,
         allPaid: order.isPaid || false,
       });
@@ -68,7 +73,7 @@ function groupOrdersByUser(orders: DailyOrderDoc[]): UserOrderGroup[] {
 // Sort với current user lên đầu
 function sortUserGroups(
   groups: UserOrderGroup[],
-  currentUserId?: string
+  currentUserId?: string,
 ): UserOrderGroup[] {
   return groups.sort((a, b) => {
     // Current user luôn lên đầu
@@ -122,7 +127,11 @@ function UserOrderCard({
 
   const unpaidAmount = group.orders
     .filter((o) => !o.isPaid)
-    .reduce((sum, o) => sum + o.menuItemPrice * o.quantity, 0);
+    .reduce((sum, o) => {
+      const item = o.menuItemDetails[0];
+      const orderTotal = (item?.price || 0) * o.quantity;
+      return sum + orderTotal;
+    }, 0);
 
   return (
     <div className="bg-white rounded-2xl border border-[#E9D7B8]/50 overflow-hidden shadow-sm">
@@ -210,49 +219,53 @@ function UserOrderCard({
 
       {/* Orders List */}
       <div className="p-4 space-y-3">
-        {group.orders.map((order) => (
-          <div
-            key={order.$id}
-            className={cn(
-              "flex items-center gap-3 p-3 rounded-xl transition-colors",
-              order.isPaid ? "bg-green-50" : "bg-[#FBF8F4]"
-            )}
-          >
-            {/* Dish Image/Emoji */}
-            <div className="w-12 h-12 rounded-lg bg-white flex items-center justify-center border border-[#E9D7B8]/30 shrink-0">
-              <span className="text-2xl">
-                {categoryEmoji[order.menuItemCategory] || "📍"}
-              </span>
-            </div>
+        {group.orders.map((order) => {
+          const item = order.menuItemDetails[0]; // Get single menu item
 
-            {/* Dish Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-[#2A2A2A]/60">
-                  {order.quantity}x
-                </span>
-                <h4 className="font-medium text-[#2A2A2A] truncate">
-                  {order.menuItemName}
-                </h4>
-              </div>
-              {order.note && (
-                <p className="text-xs text-[#2A2A2A]/50 mt-0.5">
-                  Ghi chú: {order.note}
-                </p>
+          return (
+            <div
+              key={order.$id}
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-xl transition-colors",
+                order.isPaid ? "bg-green-50" : "bg-[#FBF8F4]",
               )}
-              <p className="text-sm font-semibold text-[#D4AF37] mt-1">
-                {formatMoney(order.menuItemPrice * order.quantity)}
-              </p>
-            </div>
+            >
+              {/* Dish Image/Emoji */}
+              <div className="w-12 h-12 rounded-lg bg-white flex items-center justify-center border border-[#E9D7B8]/30 shrink-0">
+                <span className="text-2xl">
+                  {categoryEmoji[item?.category] || "📍"}
+                </span>
+              </div>
 
-            {/* Paid indicator */}
-            {order.isPaid && (
-              <span className="text-green-600">
-                <Check className="w-5 h-5" />
-              </span>
-            )}
-          </div>
-        ))}
+              {/* Dish Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-[#2A2A2A]/60">
+                    {order.quantity}x
+                  </span>
+                  <h4 className="font-medium text-[#2A2A2A] truncate">
+                    {item?.name || "Món ăn"}
+                  </h4>
+                </div>
+                {order.note && (
+                  <p className="text-xs text-[#2A2A2A]/50 mt-0.5">
+                    Ghi chú: {order.note}
+                  </p>
+                )}
+                <p className="text-sm font-semibold text-[#D4AF37] mt-1">
+                  {formatMoney((item?.price || 0) * order.quantity)}
+                </p>
+              </div>
+
+              {/* Paid indicator */}
+              {order.isPaid && (
+                <span className="text-green-600">
+                  <Check className="w-5 h-5" />
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Total */}
@@ -290,14 +303,14 @@ function UserOrderCard({
 function SummaryContent() {
   const router = useRouter();
   const { user } = useAuth();
-  const [orders, setOrders] = useState<DailyOrderDoc[]>([]);
+  const [orders, setOrders] = useState<DailyOrderWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const data = await getDailyOrders(selectedDate);
+      const data = await getAllDailyOrdersWithDetails(selectedDate);
       setOrders(data);
     } catch (error) {
       console.error("Error loading data:", error);
@@ -312,25 +325,30 @@ function SummaryContent() {
 
   const handleMarkPaid = (orderId: string, isPaid: boolean) => {
     setOrders((prev) =>
-      prev.map((o) => (o.$id === orderId ? { ...o, isPaid } : o))
+      prev.map((o) => (o.$id === orderId ? { ...o, isPaid } : o)),
     );
   };
 
   const handleMarkAllPaid = (orderIds: string[]) => {
     setOrders((prev) =>
-      prev.map((o) => (orderIds.includes(o.$id) ? { ...o, isPaid: true } : o))
+      prev.map((o) => (orderIds.includes(o.$id) ? { ...o, isPaid: true } : o)),
     );
   };
 
   const userGroups = sortUserGroups(groupOrdersByUser(orders), user?.$id);
-  const totalAmount = orders.reduce(
-    (sum, o) => sum + o.menuItemPrice * o.quantity,
-    0
-  );
+  const totalAmount = orders.reduce((sum, o) => {
+    const item = o.menuItemDetails[0];
+    const orderTotal = (item?.price || 0) * o.quantity;
+    return sum + orderTotal;
+  }, 0);
   const totalItems = orders.reduce((sum, o) => sum + o.quantity, 0);
   const paidAmount = orders
     .filter((o) => o.isPaid)
-    .reduce((sum, o) => sum + o.menuItemPrice * o.quantity, 0);
+    .reduce((sum, o) => {
+      const item = o.menuItemDetails[0];
+      const orderTotal = (item?.price || 0) * o.quantity;
+      return sum + orderTotal;
+    }, 0);
 
   if (isLoading) {
     return (
@@ -442,7 +460,6 @@ function SummaryContent() {
 export default function SummaryPage() {
   return (
     <AuthGuard>
-      <Header />
       <div className="pt-16">
         <SummaryContent />
       </div>

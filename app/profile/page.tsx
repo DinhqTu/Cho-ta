@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { AuthGuard } from "@/components/auth-guard";
-import { Header } from "@/components/header";
 import { updateName, updateEmail, updatePassword } from "@/lib/auth";
-import { clearUserNameCache, updateUserRoleName } from "@/lib/api/user-roles";
+import { updateUserRoleName } from "@/lib/api/user-roles";
 import { User, Mail, Lock, Save, Loader2, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -119,7 +118,6 @@ export default function ProfilePage() {
 
   return (
     <AuthGuard>
-      <Header />
       <main className="min-h-screen bg-[#FBF8F4] pt-20 px-4 pb-8">
         <div className="max-w-2xl mx-auto">
           {/* Profile Header */}
@@ -145,7 +143,7 @@ export default function ProfilePage() {
                 "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors",
                 activeTab === "info"
                   ? "bg-[#D4AF37] text-white"
-                  : "bg-white text-[#2A2A2A]/70 hover:bg-[#FBF8F4]"
+                  : "bg-white text-[#2A2A2A]/70 hover:bg-[#FBF8F4]",
               )}
             >
               <User className="w-4 h-4" />
@@ -157,7 +155,7 @@ export default function ProfilePage() {
                 "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors",
                 activeTab === "password"
                   ? "bg-[#D4AF37] text-white"
-                  : "bg-white text-[#2A2A2A]/70 hover:bg-[#FBF8F4]"
+                  : "bg-white text-[#2A2A2A]/70 hover:bg-[#FBF8F4]",
               )}
             >
               <Lock className="w-4 h-4" />
@@ -227,7 +225,7 @@ export default function ProfilePage() {
                       "p-3 rounded-lg text-sm",
                       infoMessage.type === "success"
                         ? "bg-green-50 text-green-700"
-                        : "bg-red-50 text-red-700"
+                        : "bg-red-50 text-red-700",
                     )}
                   >
                     {infoMessage.text}
@@ -327,7 +325,7 @@ export default function ProfilePage() {
                       "p-3 rounded-lg text-sm",
                       passwordMessage.type === "success"
                         ? "bg-green-50 text-green-700"
-                        : "bg-red-50 text-red-700"
+                        : "bg-red-50 text-red-700",
                     )}
                   >
                     {passwordMessage.text}
