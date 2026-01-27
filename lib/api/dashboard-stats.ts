@@ -1,5 +1,6 @@
-import { databases, DATABASE_ID, Query } from "../appwrite";
+import { databases, DATABASE_ID, Query, COLLECTIONS } from "../appwrite";
 import { DAILY_ORDERS_COLLECTION, DailyOrderDoc } from "./daily-orders";
+import { MenuItemDoc } from "./menu";
 
 // Helper to format date to YYYY-MM-DD (local timezone)
 function formatLocalDate(date: Date): string {
@@ -41,7 +42,7 @@ export function getDateRange(period: "day" | "week" | "month"): {
 // Get orders for a date range
 export async function getOrdersInRange(
   startDate: string,
-  endDate: string
+  endDate: string,
 ): Promise<DailyOrderDoc[]> {
   try {
     const response = await databases.listDocuments(
@@ -51,7 +52,7 @@ export async function getOrdersInRange(
         Query.greaterThanEqual("date", startDate),
         Query.lessThanEqual("date", endDate),
         Query.limit(1000),
-      ]
+      ],
     );
     return response.documents as unknown as DailyOrderDoc[];
   } catch (error) {
@@ -100,18 +101,24 @@ export interface DashboardStats {
 }
 
 // Calculate stats from orders
-function calculateStats(orders: DailyOrderDoc[]) {
+function calculateStats(
+  orders: DailyOrderDoc[],
+  menuItemMap: Map<string, MenuItemDoc>,
+) {
   const userIds = new Set<string>();
   let totalItems = 0;
   let totalAmount = 0;
   let paidAmount = 0;
 
   for (const order of orders) {
+    const menuItem = menuItemMap.get(order.menuItemId as string);
+    if (!menuItem) continue; // Skip if menu item not found
+
     userIds.add(order.userId);
     totalItems += order.quantity;
-    totalAmount += order.menuItemPrice * order.quantity;
+    totalAmount += menuItem.price * order.quantity;
     if (order.isPaid) {
-      paidAmount += order.menuItemPrice * order.quantity;
+      paidAmount += menuItem.price * order.quantity;
     }
   }
 
@@ -142,18 +149,40 @@ export async function getUserStats(userId: string): Promise<DashboardStats> {
         Query.greaterThanEqual("date", monthRange.start),
         Query.lessThanEqual("date", monthRange.end),
         Query.limit(1000),
-      ]
+      ],
     );
     const monthOrders = response.documents as unknown as DailyOrderDoc[];
+
+    // Fetch menu items details for all orders
+    const menuItemMap = new Map<string, MenuItemDoc>();
+    const uniqueMenuItemIds = [
+      ...new Set(monthOrders.map((o) => o.menuItemId as string)),
+    ];
+
+    // Fetch all unique menu items
+    await Promise.all(
+      uniqueMenuItemIds.map(async (menuItemId) => {
+        try {
+          const response = await databases.getDocument(
+            DATABASE_ID,
+            COLLECTIONS.MENU_ITEMS,
+            menuItemId,
+          );
+          menuItemMap.set(menuItemId, response as unknown as MenuItemDoc);
+        } catch (error) {
+          console.error(`Failed to fetch menu item ${menuItemId}:`, error);
+        }
+      }),
+    );
 
     // Filter for different periods
     const todayOrders = monthOrders.filter((o) => o.date === today);
     const weekOrders = monthOrders.filter((o) => o.date >= weekRange.start);
 
     // Calculate stats
-    const todayStats = calculateStats(todayOrders);
-    const weekStats = calculateStats(weekOrders);
-    const monthStats = calculateStats(monthOrders);
+    const todayStats = calculateStats(todayOrders, menuItemMap);
+    const weekStats = calculateStats(weekOrders, menuItemMap);
+    const monthStats = calculateStats(monthOrders, menuItemMap);
 
     // Daily data for chart (last 7 days)
     const dailyData: DashboardStats["dailyData"] = [];
@@ -162,7 +191,7 @@ export async function getUserStats(userId: string): Promise<DashboardStats> {
       date.setDate(date.getDate() - i);
       const dateStr = formatLocalDate(date);
       const dayOrders = monthOrders.filter((o) => o.date === dateStr);
-      const dayStats = calculateStats(dayOrders);
+      const dayStats = calculateStats(dayOrders, menuItemMap);
 
       dailyData.push({
         date: dateStr,
@@ -178,15 +207,20 @@ export async function getUserStats(userId: string): Promise<DashboardStats> {
       { name: string; quantity: number; amount: number }
     >();
     for (const order of monthOrders) {
-      const existing = itemMap.get(order.menuItemId);
+      const menuItemId = order.menuItemId as string;
+      const menuItem = menuItemMap.get(menuItemId);
+
+      if (!menuItem) continue; // Skip if menu item not found
+
+      const existing = itemMap.get(menuItemId);
       if (existing) {
         existing.quantity += order.quantity;
-        existing.amount += order.menuItemPrice * order.quantity;
+        existing.amount += menuItem.price * order.quantity;
       } else {
-        itemMap.set(order.menuItemId, {
-          name: order.menuItemName,
+        itemMap.set(menuItemId, {
+          name: menuItem.name,
           quantity: order.quantity,
-          amount: order.menuItemPrice * order.quantity,
+          amount: menuItem.price * order.quantity,
         });
       }
     }
@@ -226,14 +260,36 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   // Fetch all orders for the month (includes week and today)
   const monthOrders = await getOrdersInRange(monthRange.start, monthRange.end);
 
+  // Fetch menu items details for all orders
+  const menuItemMap = new Map<string, MenuItemDoc>();
+  const uniqueMenuItemIds = [
+    ...new Set(monthOrders.map((o) => o.menuItemId as string)),
+  ];
+
+  // Fetch all unique menu items
+  await Promise.all(
+    uniqueMenuItemIds.map(async (menuItemId) => {
+      try {
+        const response = await databases.getDocument(
+          DATABASE_ID,
+          COLLECTIONS.MENU_ITEMS,
+          menuItemId,
+        );
+        menuItemMap.set(menuItemId, response as unknown as MenuItemDoc);
+      } catch (error) {
+        console.error(`Failed to fetch menu item ${menuItemId}:`, error);
+      }
+    }),
+  );
+
   // Filter for different periods
   const todayOrders = monthOrders.filter((o) => o.date === today);
   const weekOrders = monthOrders.filter((o) => o.date >= weekRange.start);
 
   // Calculate stats
-  const todayStats = calculateStats(todayOrders);
-  const weekStats = calculateStats(weekOrders);
-  const monthStats = calculateStats(monthOrders);
+  const todayStats = calculateStats(todayOrders, menuItemMap);
+  const weekStats = calculateStats(weekOrders, menuItemMap);
+  const monthStats = calculateStats(monthOrders, menuItemMap);
 
   // Daily data for chart (last 7 days)
   const dailyData: DashboardStats["dailyData"] = [];
@@ -242,7 +298,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     date.setDate(date.getDate() - i);
     const dateStr = formatLocalDate(date);
     const dayOrders = monthOrders.filter((o) => o.date === dateStr);
-    const dayStats = calculateStats(dayOrders);
+    const dayStats = calculateStats(dayOrders, menuItemMap);
 
     dailyData.push({
       date: dateStr,
@@ -258,15 +314,20 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     { name: string; quantity: number; amount: number }
   >();
   for (const order of monthOrders) {
-    const existing = itemMap.get(order.menuItemId);
+    const menuItemId = order.menuItemId as string;
+    const menuItem = menuItemMap.get(menuItemId);
+
+    if (!menuItem) continue; // Skip if menu item not found
+
+    const existing = itemMap.get(menuItemId);
     if (existing) {
       existing.quantity += order.quantity;
-      existing.amount += order.menuItemPrice * order.quantity;
+      existing.amount += menuItem.price * order.quantity;
     } else {
-      itemMap.set(order.menuItemId, {
-        name: order.menuItemName,
+      itemMap.set(menuItemId, {
+        name: menuItem.name,
         quantity: order.quantity,
-        amount: order.menuItemPrice * order.quantity,
+        amount: menuItem.price * order.quantity,
       });
     }
   }
@@ -280,15 +341,18 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     { name: string; orders: number; amount: number }
   >();
   for (const order of monthOrders) {
+    const menuItem = menuItemMap.get(order.menuItemId as string);
+    if (!menuItem) continue; // Skip if menu item not found
+
     const existing = userMap.get(order.userId);
     if (existing) {
       existing.orders += 1;
-      existing.amount += order.menuItemPrice * order.quantity;
+      existing.amount += menuItem.price * order.quantity;
     } else {
       userMap.set(order.userId, {
         name: order.userName,
         orders: 1,
-        amount: order.menuItemPrice * order.quantity,
+        amount: menuItem.price * order.quantity,
       });
     }
   }

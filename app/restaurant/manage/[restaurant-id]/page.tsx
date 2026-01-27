@@ -34,6 +34,7 @@ import {
   Settings,
   Loader2,
   Search,
+  SquareMenu,
 } from "lucide-react";
 
 interface MenuItem {
@@ -71,7 +72,7 @@ export default function RestaurantManagePage() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"dishes" | "menu" | "info">(
-    "dishes",
+    "menu",
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Form states
@@ -542,7 +543,7 @@ export default function RestaurantManagePage() {
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <Settings className="w-4 h-4" />
+                    <SquareMenu className="w-4 h-4" />
                     Thực đơn
                   </div>
                 </button>
@@ -747,19 +748,6 @@ export default function RestaurantManagePage() {
                     Lựa chọn các món ăn sẽ hiển thị trong thực đơn của quán
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">
-                    Đã chọn: {selectedMenuIds.length} món
-                  </span>
-                  {selectedMenuIds.length > 0 && (
-                    <button
-                      onClick={() => setSelectedMenuIds([])}
-                      className="text-sm text-red-600 hover:text-red-800"
-                    >
-                      Xóa tất cả
-                    </button>
-                  )}
-                </div>
               </div>
 
               {menuItems.length === 0 ? (
@@ -779,234 +767,247 @@ export default function RestaurantManagePage() {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {/* Search and Filter */}
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1 relative">
-                      <input
-                        type="text"
-                        placeholder="Tìm kiếm món ăn..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
-                      />
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      {searchQuery && (
-                        <button
-                          onClick={() => setSearchQuery("")}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
-                    >
-                      <option value="">Tất cả danh mục</option>
-                      {menuCategories.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {categoryEmoji[cat] || "📍"} {cat}
-                        </option>
-                      ))}
-                    </select>
-                    {(debouncedSearchQuery || selectedCategory) && (
-                      <button
-                        onClick={() => {
-                          setSearchQuery("");
-                          setSelectedCategory("");
-                        }}
-                        className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
+                <div className="flex gap-6">
+                  {/* Left Column - Menu Items List (3/4) */}
+                  <div className="flex-1 space-y-4">
+                    {/* Search and Filter */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 relative">
+                        <input
+                          type="text"
+                          placeholder="Tìm kiếm món ăn..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                        />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        {searchQuery && (
+                          <button
+                            onClick={() => setSearchQuery("")}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
                       >
-                        Xóa bộ lọc
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Search Results Info */}
-                  {(debouncedSearchQuery || selectedCategory) && (
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="text-sm text-gray-600">
-                        {debouncedSearchQuery && (
-                          <span>
-                            Tìm kiếm: <strong>"{debouncedSearchQuery}"</strong>
-                          </span>
-                        )}
-                        {debouncedSearchQuery && selectedCategory && (
-                          <span className="mx-2">•</span>
-                        )}
-                        {selectedCategory && (
-                          <span>
-                            Danh mục: <strong>{selectedCategory}</strong>
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {filteredMenuItems.length} kết quả
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Menu Items Grid */}
-                  {filteredMenuItems.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">
-                        Không tìm thấy món ăn nào
-                      </h3>
-                      <p className="text-gray-500 mb-6">
-                        {debouncedSearchQuery &&
-                          "Thử tìm kiếm với từ khóa khác"}
-                        {selectedCategory && "Thử chọn danh mục khác"}
-                        {debouncedSearchQuery &&
-                          selectedCategory &&
-                          "Thử điều chỉnh bộ lọc"}
-                      </p>
+                        <option value="">Tất cả danh mục</option>
+                        {menuCategories.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {categoryEmoji[cat] || "📍"} {cat}
+                          </option>
+                        ))}
+                      </select>
                       {(debouncedSearchQuery || selectedCategory) && (
                         <button
                           onClick={() => {
                             setSearchQuery("");
                             setSelectedCategory("");
                           }}
-                          className="px-4 py-2 text-[#D4AF37] hover:text-[#C5A028] font-medium"
+                          className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
                         >
                           Xóa bộ lọc
                         </button>
                       )}
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredMenuItems.map((item) => {
-                        const isSelected = selectedMenuIds.includes(item.$id);
-                        return (
-                          <MenuItemCard
-                            key={item.$id}
-                            item={{
-                              id: item.$id,
-                              name: item.name,
-                              description: item.description,
-                              price: item.price,
-                              category: item.category,
-                              image: item.image,
-                            }}
-                            isSelected={isSelected}
-                            isSelectable={true}
-                            onSelect={() => {
-                              if (isSelected) {
-                                setSelectedMenuIds(
-                                  selectedMenuIds.filter(
-                                    (id) => id !== item.$id,
-                                  ),
-                                );
-                              } else {
-                                setSelectedMenuIds([
-                                  ...selectedMenuIds,
-                                  item.$id,
-                                ]);
-                              }
-                            }}
-                            layout="card"
-                            showActions={false}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
 
-                  {selectedMenuIds.length > 0 && (
-                    <div className="mt-6 p-4 bg-[#F8F4EE] rounded-xl">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold text-gray-900">
-                          Món đã chọn ({selectedMenuIds.length})
-                        </h3>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <span className="px-2 py-1 bg-white rounded-full">
-                            {restaurantForm.menuType === "dynamic"
-                              ? "📅 Menu động"
-                              : "📋 Menu cố định"}
-                          </span>
+                    {/* Search Results Info */}
+                    {(debouncedSearchQuery || selectedCategory) && (
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="text-sm text-gray-600">
+                          {debouncedSearchQuery && (
+                            <span>
+                              Tìm kiếm:{" "}
+                              <strong>"{debouncedSearchQuery}"</strong>
+                            </span>
+                          )}
+                          {debouncedSearchQuery && selectedCategory && (
+                            <span className="mx-2">•</span>
+                          )}
+                          {selectedCategory && (
+                            <span>
+                              Danh mục: <strong>{selectedCategory}</strong>
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {filteredMenuItems.length} kết quả
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        {selectedMenuItems.map((item) => {
-                          if (!item) return null;
+                    )}
+
+                    {/* Menu Items Grid */}
+                    {filteredMenuItems.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                          Không tìm thấy món ăn nào
+                        </h3>
+                        <p className="text-gray-500 mb-6">
+                          {debouncedSearchQuery &&
+                            "Thử tìm kiếm với từ khóa khác"}
+                          {selectedCategory && "Thử chọn danh mục khác"}
+                          {debouncedSearchQuery &&
+                            selectedCategory &&
+                            "Thử điều chỉnh bộ lọc"}
+                        </p>
+                        {(debouncedSearchQuery || selectedCategory) && (
+                          <button
+                            onClick={() => {
+                              setSearchQuery("");
+                              setSelectedCategory("");
+                            }}
+                            className="px-4 py-2 text-[#D4AF37] hover:text-[#C5A028] font-medium"
+                          >
+                            Xóa bộ lọc
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredMenuItems.map((item) => {
+                          const isSelected = selectedMenuIds.includes(item.$id);
                           return (
-                            <div
+                            <MenuItemCard
                               key={item.$id}
-                              className="flex items-center justify-between text-sm"
-                            >
-                              <div className="flex items-center gap-2">
-                                <span>
-                                  {categoryEmoji[item.category] || "📍"}
-                                </span>
-                                <span>{item.name}</span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <span className="font-medium text-[#D4AF37]">
-                                  {formatMoney(item.price)}
-                                </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedMenuIds(
-                                      selectedMenuIds.filter(
-                                        (id) => id !== item.$id,
-                                      ),
-                                    );
-                                  }}
-                                  className="text-red-500 hover:text-red-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
+                              item={{
+                                id: item.$id,
+                                name: item.name,
+                                description: item.description,
+                                price: item.price,
+                                category: item.category,
+                                image: item.image,
+                              }}
+                              isSelected={isSelected}
+                              isSelectable={true}
+                              onSelect={() => {
+                                if (isSelected) {
+                                  setSelectedMenuIds(
+                                    selectedMenuIds.filter(
+                                      (id) => id !== item.$id,
+                                    ),
+                                  );
+                                } else {
+                                  setSelectedMenuIds([
+                                    ...selectedMenuIds,
+                                    item.$id,
+                                  ]);
+                                }
+                              }}
+                              layout="card"
+                              showActions={false}
+                            />
                           );
                         })}
                       </div>
-                      <div className="mt-4 pt-4 border-t border-[#E9D7B8]/50">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-gray-900">
-                            Tổng cộng:
-                          </span>
-                          <span className="text-lg font-bold text-[#D4AF37]">
-                            {formatMoney(
-                              selectedMenuItems.reduce((total, item) => {
-                                return total + (item?.price || 0);
-                              }, 0),
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
-                  {/* Save Menu Button */}
-                  {selectedMenuIds.length > 0 && (
-                    <div className="flex justify-end mt-6">
-                      <div className="flex items-center gap-3 text-sm text-gray-600 mr-4">
-                        {dailyMenuId ? (
-                          <span>Cập nhật thực đơn hôm nay</span>
-                        ) : (
-                          <span>Tạo thực đơn mới</span>
+                  {/* Right Column - Selected Items (1/4) */}
+                  <div className="w-1/4 min-w-[300px]">
+                    <div className="bg-[#F8F4EE] rounded-xl p-4 sticky top-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold text-gray-900">
+                          Thực đơn
+                        </h3>
+                        {selectedMenuIds.length > 0 && (
+                          <button
+                            onClick={() => setSelectedMenuIds([])}
+                            className="text-sm text-red-600 hover:text-red-800"
+                          >
+                            Xóa tất cả
+                          </button>
                         )}
                       </div>
-                      <button
-                        onClick={handleSaveRestaurantMenu}
-                        disabled={isSubmitting}
-                        className="px-6 py-2 bg-[#D4AF37] text-white rounded-lg hover:bg-[#C5A028] transition-colors disabled:opacity-50"
-                      >
-                        {isSubmitting ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : dailyMenuId ? (
-                          "Cập nhật thực đơn"
-                        ) : (
-                          "Lưu thực đơn"
-                        )}
-                      </button>
+
+                      {selectedMenuIds.length === 0 ? (
+                        <div className="text-center py-8">
+                          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <UtensilsCrossed className="w-6 h-6 text-gray-400" />
+                          </div>
+                          <p className="text-sm text-gray-500">
+                            Chưa chọn món nào
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {selectedMenuItems.map((item) => {
+                              if (!item) return null;
+                              return (
+                                <div
+                                  key={item.$id}
+                                  className="flex items-center justify-between p-2 bg-white rounded-lg text-sm group"
+                                >
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <span className="shrink-0">
+                                      {categoryEmoji[item.category] || "📍"}
+                                    </span>
+                                    <span className="truncate">
+                                      {item.name}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="font-medium text-[#D4AF37] text-xs">
+                                      {formatMoney(item.price)}
+                                    </span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedMenuIds(
+                                          selectedMenuIds.filter(
+                                            (id) => id !== item.$id,
+                                          ),
+                                        );
+                                      }}
+                                      className="text-red-500 hidden group-hover:block hover:text-red-700 cursor-pointer"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="mt-4 pt-4 border-t border-[#E9D7B8]/50">
+                            <div className="flex items-center justify-between mb-4">
+                              <span className="font-semibold text-gray-900">
+                                Tổng cộng:
+                              </span>
+                              <span className="text-lg font-bold text-[#D4AF37]">
+                                {selectedMenuItems.length} món
+                              </span>
+                            </div>
+
+                            {/* Save Menu Button - Moved here */}
+                            <div className="space-y-3">
+                              <button
+                                onClick={handleSaveRestaurantMenu}
+                                disabled={isSubmitting}
+                                className="w-full px-4 py-2 bg-[#D4AF37] text-white rounded-lg hover:bg-[#C5A028] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                              >
+                                {isSubmitting ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    <span>Đang lưu...</span>
+                                  </>
+                                ) : dailyMenuId ? (
+                                  "Cập nhật thực đơn"
+                                ) : (
+                                  "Lưu thực đơn"
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>

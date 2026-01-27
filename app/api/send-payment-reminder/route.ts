@@ -6,6 +6,7 @@ import {
   sendIndividualPaymentReminder,
   UnpaidUserInfo,
 } from "@/lib/vchat";
+import { MenuItemDoc } from "@/lib/api/menu";
 
 // Get all unpaid orders grouped by user
 async function getUnpaidOrdersByUser(): Promise<UnpaidUserInfo[]> {
@@ -13,7 +14,7 @@ async function getUnpaidOrdersByUser(): Promise<UnpaidUserInfo[]> {
     const response = await serverDatabases.listDocuments(
       DATABASE_ID,
       DAILY_ORDERS_COLLECTION,
-      [Query.equal("isPaid", false), Query.limit(500)]
+      [Query.equal("isPaid", false), Query.limit(500)],
     );
 
     const orders = response.documents as unknown as DailyOrderDoc[];
@@ -32,7 +33,7 @@ async function getUnpaidOrdersByUser(): Promise<UnpaidUserInfo[]> {
 
     for (const order of orders) {
       const existing = userMap.get(order.userId);
-      const amount = order.menuItemPrice * order.quantity;
+      const amount = (order.menuItemId as MenuItemDoc).price * order.quantity;
 
       if (existing) {
         existing.totalAmount += amount;
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
       } else {
         return NextResponse.json(
           { success: false, message: "User không có đơn chưa thanh toán" },
-          { status: 404 }
+          { status: 404 },
         );
       }
     } else {
@@ -103,14 +104,14 @@ export async function POST(request: NextRequest) {
     } else {
       return NextResponse.json(
         { success: false, message: "Không thể gửi thông báo" },
-        { status: 500 }
+        { status: 500 },
       );
     }
   } catch (error) {
     console.error("Error in send-payment-reminder:", error);
     return NextResponse.json(
       { success: false, message: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -131,7 +132,7 @@ export async function GET() {
     console.error("Error fetching unpaid summary:", error);
     return NextResponse.json(
       { success: false, message: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

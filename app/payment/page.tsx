@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { QRPaymentModal } from "@/components/qr-payment-modal";
 import { PayOSPaymentModal } from "@/components/payos-payment-modal";
+import { MenuItemDoc } from "@/lib/api/menu";
 
 type PaymentMethod = "momo" | "bank" | null;
 
@@ -63,7 +64,7 @@ function PaymentContent() {
   }, [user, date]);
 
   const totalAmount = orders.reduce(
-    (sum, o) => sum + o.menuItemPrice * o.quantity,
+    (sum, o) => sum + (o.menuItemId as MenuItemDoc).price * o.quantity,
     0,
   );
 
@@ -181,10 +182,14 @@ function PaymentContent() {
                   <span className="text-sm text-[#2A2A2A]/60">
                     {order.quantity}x
                   </span>
-                  <span className="text-[#2A2A2A]">{order.menuItemName}</span>
+                  <span className="text-[#2A2A2A]">
+                    {(order.menuItemId as MenuItemDoc).name}
+                  </span>
                 </div>
                 <span className="font-medium text-[#D4AF37]">
-                  {formatMoney(order.menuItemPrice * order.quantity)}
+                  {formatMoney(
+                    (order.menuItemId as MenuItemDoc).price * order.quantity,
+                  )}
                 </span>
               </div>
             ))}

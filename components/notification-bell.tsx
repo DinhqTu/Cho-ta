@@ -23,6 +23,7 @@ import {
   registerServiceWorker,
   showLocalNotification,
 } from "@/lib/push-notifications";
+import { MenuItemDoc } from "@/lib/api/menu";
 
 // Notification sound URL
 const NOTIFICATION_SOUND_URL = "/assets/media/notification.mp3";
@@ -60,7 +61,7 @@ function NotificationItem({
     <div
       className={cn(
         "p-3 border-b border-[#E9D7B8]/30 hover:bg-[#FBF8F4] transition-colors cursor-pointer",
-        !notification.isRead && "bg-[#D4AF37]/5"
+        !notification.isRead && "bg-[#D4AF37]/5",
       )}
       onClick={onMarkRead}
     >
@@ -73,7 +74,7 @@ function NotificationItem({
                 "text-sm",
                 notification.isRead
                   ? "text-[#2A2A2A]/70"
-                  : "text-[#2A2A2A] font-medium"
+                  : "text-[#2A2A2A] font-medium",
               )}
             >
               {notification.title}
@@ -158,8 +159,8 @@ export function NotificationBell() {
 
       if (unpaidOrders.length > 0) {
         const totalUnpaid = unpaidOrders.reduce(
-          (sum, o) => sum + o.menuItemPrice * o.quantity,
-          0
+          (sum, o) => sum + (o.menuItemId as MenuItemDoc).price * o.quantity,
+          0,
         );
 
         // Create payment reminder notification
@@ -169,9 +170,9 @@ export function NotificationBell() {
           `Bạn có ${
             unpaidOrders.length
           } món chưa thanh toán với tổng ${formatMoney(
-            totalUnpaid
+            totalUnpaid,
           )}. Vui lòng thanh toán để hoàn tất đơn hàng!`,
-          "payment_reminder"
+          "payment_reminder",
         );
 
         lastReminderRef.current = reminderKey;
@@ -215,7 +216,7 @@ export function NotificationBell() {
         showLocalNotification(
           notification.title,
           notification.message,
-          "/group-order"
+          "/group-order",
         );
       }
     });
@@ -247,8 +248,8 @@ export function NotificationBell() {
     if (success) {
       setNotifications((prev) =>
         prev.map((n) =>
-          n.$id === notification.$id ? { ...n, isRead: true } : n
-        )
+          n.$id === notification.$id ? { ...n, isRead: true } : n,
+        ),
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
     }

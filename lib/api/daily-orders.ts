@@ -1,6 +1,7 @@
 import { databases, DATABASE_ID, ID, Query, COLLECTIONS } from "../appwrite";
 import { User } from "../auth";
 import { MenuItemDoc } from "./menu";
+import { RestaurantDoc } from "./restaurants";
 
 // Collection ID for daily orders
 export const DAILY_ORDERS_COLLECTION = "daily_orders";
@@ -34,12 +35,12 @@ export interface DailyOrderDoc {
   userId: string;
   userName: string;
   userEmail: string;
-  menuItemId: string;
+  menuItemId: string | MenuItemDoc;
   quantity: number;
   note?: string;
   isPaid: boolean;
   date: string;
-  restaurantId: string;
+  restaurantId: string | RestaurantDoc;
 }
 
 export interface DailyOrderInput {
@@ -51,6 +52,7 @@ export interface DailyOrderInput {
 
 export interface DailyOrderWithDetails extends DailyOrderDoc {
   menuItemDetails: MenuItemDoc[]; // Keep array for consistency but will have 1 item
+  restaurantDetails?: RestaurantDoc; // Restaurant details when restaurantId is a relationship
 }
 
 // Get today's date in YYYY-MM-DD format (local timezone)
@@ -230,7 +232,7 @@ export async function getAllDailyOrdersWithDetails(
             const menuItemResponse = await databases.getDocument(
               DATABASE_ID,
               COLLECTIONS.MENU_ITEMS,
-              order.menuItemId,
+              order.menuItemId as string,
             );
             menuItemDetails = [menuItemResponse as unknown as MenuItemDoc];
           } catch (e) {
@@ -414,7 +416,7 @@ export async function getDailyOrderSummary(
 
   for (const order of orders) {
     // Use menuItemId as key
-    const key = order.menuItemId;
+    const key = order.menuItemId as string;
     const existing = summaryMap.get(key);
 
     // Fetch menu item details for this order
@@ -424,7 +426,7 @@ export async function getDailyOrderSummary(
         const menuItemResponse = await databases.getDocument(
           DATABASE_ID,
           COLLECTIONS.MENU_ITEMS,
-          order.menuItemId,
+          order.menuItemId as string,
         );
         menuItemDetails = [menuItemResponse as unknown as MenuItemDoc];
       } catch (e) {
@@ -450,7 +452,7 @@ export async function getDailyOrderSummary(
       });
     } else {
       summaryMap.set(key, {
-        menuItemId: order.menuItemId,
+        menuItemId: order.menuItemId as string,
         menuItemDetails,
         totalQuantity: order.quantity,
         totalAmount,
@@ -526,7 +528,7 @@ export async function getUserUnpaidOrders(
               const menuItemResponse = await databases.getDocument(
                 DATABASE_ID,
                 COLLECTIONS.MENU_ITEMS,
-                order.menuItemId,
+                order.menuItemId as string,
               );
               const menuItem = menuItemResponse as unknown as MenuItemDoc;
               const orderTotal = (menuItem.price || 0) * order.quantity;
@@ -582,7 +584,7 @@ export async function getDailyStats(
         const menuItemResponse = await databases.getDocument(
           DATABASE_ID,
           COLLECTIONS.MENU_ITEMS,
-          order.menuItemId,
+          order.menuItemId as string,
         );
         const menuItem = menuItemResponse as unknown as MenuItemDoc;
 
@@ -618,4 +620,108 @@ export async function getDailyStats(
     uniqueUsers: userIds.size,
     topItems,
   };
+}
+
+// Get all orders for a user with details
+export async function getAllUserOrdersWithDetails(
+  userId: string,
+  limit?: number,
+  offset?: number,
+): Promise<DailyOrderWithDetails[]> {
+  try {
+    const queries = [
+      Query.equal("userId", userId),
+      Query.orderDesc("$createdAt"), // Most recent first
+      Query.limit(limit || 100),
+    ];
+
+    if (offset) {
+      queries.push(Query.offset(offset));
+    }
+
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      DAILY_ORDERS_COLLECTION,
+      queries,
+    );
+
+    const orders = response.documents as unknown as DailyOrderDoc[];
+
+    // Fetch menu item and restaurant details for each order
+    const ordersWithDetails: DailyOrderWithDetails[] = await Promise.all(
+      orders.map(async (order) => {
+        try {
+          // Skip API calls if essential data is missing
+          if (!order.menuItemId || typeof order.menuItemId !== "string") {
+            // Return order with empty details - no API calls made
+            return {
+              ...order,
+              menuItemDetails: [],
+              restaurantDetails: undefined,
+            };
+          }
+
+          // Fetch menu item details
+          const menuItemResponse = await databases.getDocument(
+            DATABASE_ID,
+            COLLECTIONS.MENU_ITEMS,
+            order.menuItemId,
+          );
+
+          const menuItem = menuItemResponse as unknown as MenuItemDoc;
+
+          // Fetch restaurant details only if restaurantId exists and is valid
+          let restaurantDetails: RestaurantDoc | undefined;
+          if (
+            order.restaurantId &&
+            typeof order.restaurantId === "string" &&
+            order.restaurantId.trim()
+          ) {
+            try {
+              const restaurantResponse = await databases.getDocument(
+                DATABASE_ID,
+                COLLECTIONS.RESTAURANTS,
+                order.restaurantId,
+              );
+              restaurantDetails =
+                restaurantResponse as unknown as RestaurantDoc;
+            } catch (restaurantError) {
+              console.error(
+                `Failed to fetch restaurant ${order.restaurantId}:`,
+                restaurantError,
+              );
+            }
+          } else if (
+            order.restaurantId &&
+            typeof order.restaurantId === "object"
+          ) {
+            // restaurantId is already a populated RestaurantDoc
+            restaurantDetails = order.restaurantId as RestaurantDoc;
+          }
+
+          return {
+            ...order,
+            menuItemDetails: [menuItem],
+            restaurantDetails,
+          };
+        } catch (error) {
+          console.error(
+            `Failed to fetch menu item ${order.menuItemId}:`,
+            error,
+          );
+          // Return order with empty details if fetch fails
+          return {
+            ...order,
+            menuItemDetails: [],
+            restaurantDetails: undefined,
+          };
+        }
+      }),
+    );
+
+    return ordersWithDetails;
+  } catch (error) {
+    console.error("Error fetching user orders:", error);
+    throw error;
+  }
 }

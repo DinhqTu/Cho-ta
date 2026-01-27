@@ -49,7 +49,7 @@ function groupOrdersByUser(orders: DailyOrderDoc[]): UserOrderGroup[] {
     const existing = userMap.get(order.userId);
     if (existing) {
       existing.orders.push(order);
-      existing.totalAmount += order.menuItemPrice * order.quantity;
+      existing.totalAmount += (order.menuItemId as MenuItemDoc).price * order.quantity;
       existing.totalItems += order.quantity;
       if (!order.isPaid) existing.allPaid = false;
     } else {
@@ -58,7 +58,7 @@ function groupOrdersByUser(orders: DailyOrderDoc[]): UserOrderGroup[] {
         userName: order.userName,
         userEmail: order.userEmail,
         orders: [order],
-        totalAmount: order.menuItemPrice * order.quantity,
+        totalAmount: (order.menuItemId as MenuItemDoc).price * order.quantity,
         totalItems: order.quantity,
         allPaid: order.isPaid || false,
       });
@@ -318,7 +318,7 @@ function UserOrderCard({
                 </p>
               )}
               <p className="text-sm font-semibold text-[#D4AF37] mt-1">
-                {formatMoney(order.menuItemPrice * order.quantity)}
+                {formatMoney((order.menuItemId as MenuItemDoc).price * order.quantity)}
               </p>
             </div>
 

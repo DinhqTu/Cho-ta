@@ -120,6 +120,7 @@ export const menuCategories = [
 ];
 
 export const categoryEmoji: Record<string, string> = {
+  Appetizers: "🍽️",
   Cá: "🐟",
   "Thịt heo": "🐖",
   "Thịt bò": "🐄",

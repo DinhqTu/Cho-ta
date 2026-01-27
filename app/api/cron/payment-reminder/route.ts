@@ -6,6 +6,7 @@ import {
   getTodayDate,
 } from "@/lib/api/daily-orders";
 import { sendPaymentReminder, UnpaidUserInfo } from "@/lib/vchat";
+import { MenuItemDoc } from "@/lib/api/menu";
 
 // Secret key để bảo vệ cron endpoint
 const CRON_SECRET = process.env.CRONJOB_SECRET || "your-cron-secret-key";
@@ -33,7 +34,7 @@ async function getTodayUnpaidUsers(): Promise<UnpaidUserInfo[]> {
         Query.equal("date", today),
         Query.equal("isPaid", false),
         Query.limit(500),
-      ]
+      ],
     );
 
     const orders = response.documents as unknown as DailyOrderDoc[];
@@ -52,7 +53,7 @@ async function getTodayUnpaidUsers(): Promise<UnpaidUserInfo[]> {
 
     for (const order of orders) {
       const existing = userMap.get(order.userId);
-      const amount = order.menuItemPrice * order.quantity;
+      const amount = (order.menuItemId as MenuItemDoc).price * order.quantity;
 
       if (existing) {
         existing.totalAmount += amount;
@@ -124,7 +125,7 @@ export async function GET(request: NextRequest) {
     console.error("Cron payment reminder error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
